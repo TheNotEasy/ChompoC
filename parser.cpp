@@ -5,6 +5,7 @@
 #include <string>
 #include <utility>
 #include <memory>
+#include <variant>
 
 namespace {
     constexpr std::size_t token_index(TokenType type) {
@@ -16,7 +17,7 @@ Parser::Precedence Parser::next_precedence(Precedence precedence) {
     return static_cast<Precedence>(static_cast<int>(precedence) + 1);
 }
 
-Parser::Parser(std::vector<Token> tokens) : tokens_(move(tokens)) {}
+Parser::Parser(std::vector<Token> tokens) : tokens_(std::move(tokens)) {}
 
 const Token& Parser::peek() const {
     if (current_ >= tokens_.size()) return tokens_.back();
@@ -109,8 +110,8 @@ const Parser::ParseRule& Parser::get_rule(TokenType type) {
         // (expression)
         result[token_index(TokenType::LeftParen)] = {
             &Parser::grouping,
-            nullptr,
-            Precedence::None
+            &Parser::call,
+            Precedence::Call
         };
         // -value и left - right
         result[token_index(TokenType::Minus)] = {
@@ -189,6 +190,16 @@ const Parser::ParseRule& Parser::get_rule(TokenType type) {
             &Parser::binary,
             Precedence::Or
         };
+        result[token_index(TokenType::Equal)] = {
+            nullptr,
+            &Parser::assignment,
+            Precedence::Assignment
+        };
+        result[token_index(TokenType::LeftBrace)] = {
+            &Parser::array_literal,
+            nullptr,
+            Precedence::None
+        };
 
         return result;
     } ();
@@ -238,6 +249,19 @@ ExprPtr Parser::unary() {
     return std::make_unique<Expr>(UnaryExpr(operation, std::move(right)));
 }
 
+ExprPtr Parser::array_literal() {
+    std::vector<ExprPtr> elements;
+    if (!check(TokenType::RightBrace)) {
+        while (true) {
+            elements.push_back(expression());
+            if (!match({TokenType::Comma})) break;
+            if (check(TokenType::RightBrace)) break;
+        }
+    }
+    consume (TokenType::RightBrace, "expected '}' after array elements");
+    return std::make_unique<Expr>(ArrayExpr{std::move(elements)});
+}
+
 ExprPtr Parser::binary(ExprPtr left) {
     const Token operation = previous();
 
@@ -245,6 +269,34 @@ ExprPtr Parser::binary(ExprPtr left) {
 
     ExprPtr right = parse_precedence(next_precedence(precedence));
     return std::make_unique<Expr>(BinaryExpr(std::move(left), operation, std::move(right)));
+}
+
+ExprPtr Parser::assignment(ExprPtr left) {
+    const Token operation = previous();
+    const auto* variable = std::get_if<VariableExpr>(&left->node);
+
+    if (variable == nullptr) error(operation, "invalid assignment target");
+
+    const Token name = variable->name;
+
+    ExprPtr value = parse_precedence(Precedence::Assignment);
+
+    return std::make_unique<Expr>(AssignmentExpr{name, std::move(value)});
+}
+
+ExprPtr Parser::call(ExprPtr callee) {
+    std::vector<ExprPtr> arguments;
+
+    if (!check(TokenType::RightParen)) {
+        while (true) {
+            arguments.push_back(expression());
+            if (!match({TokenType::Comma})) break;
+            if (check(TokenType::RightParen)) break;
+        }
+    }
+    const Token closing_parenthesis = consume (TokenType::RightParen, "expected ')' after function arguments");
+
+    return std::make_unique<Expr>(CallExpr{std::move(callee), closing_parenthesis, std::move(arguments)});
 }
 
 Program Parser::parse() {
@@ -286,12 +338,9 @@ StmtPtr Parser::var_declaration() {
 }
 
 StmtPtr Parser::statement() {
-    if (match({TokenType::Print})) {
-        return print_statement();
-    }
-    if (match({TokenType::LeftBrace})) {
-        return block_statement();
-    }
+    if (match({TokenType::Print})) return print_statement();
+    if (match({TokenType::LeftBrace})) return block_statement();
+    if (match({TokenType::If})) return if_statement();
     return expression_statement();
 }
 
@@ -333,4 +382,14 @@ std::vector<StmtPtr> Parser::block() {
 
     consume(TokenType::RightBrace, "expected '}' after block");
     return statements;
+}
+
+StmtPtr Parser::if_statement() {
+    consume(TokenType::LeftParen, "expected '(' after 'if'");
+    ExprPtr condition = expression();
+    consume(TokenType::RightParen, "expected ')' after condition");
+    StmtPtr then_branch = statement();
+    StmtPtr else_branch;
+    if (match({TokenType::Else})) else_branch = statement();
+    return std::make_unique<Stmt>(IfStmt(std::move(condition), std::move(then_branch), std::move(else_branch)));
 }

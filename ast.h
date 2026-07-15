@@ -33,8 +33,23 @@ struct GroupingExpr {
     ExprPtr expression;
 };
 
+struct AssignmentExpr {
+    Token name;
+    ExprPtr value;
+};
+
+struct CallExpr {
+    ExprPtr callee;
+    Token closing_parenthesis;
+    std::vector<ExprPtr> arguments;
+};
+
+struct ArrayExpr {
+    std::vector<ExprPtr> elements;
+};
+
 struct Expr {
-    using Node = std::variant<LiteralExpr, UnaryExpr, BinaryExpr, GroupingExpr, VariableExpr>;
+    using Node = std::variant<LiteralExpr, UnaryExpr, BinaryExpr, GroupingExpr, VariableExpr, AssignmentExpr, CallExpr, ArrayExpr>;
 
     Node node;
 
@@ -65,11 +80,17 @@ struct BlockStmt {
     std::vector<StmtPtr> statements;
 };
 
+struct IfStmt {
+    ExprPtr condition;
+    StmtPtr then_branch;
+    StmtPtr else_branch;
+};
+
 struct Stmt {
-    using Node = std::variant<PrintStmt, BlockStmt, VarStmt, ExpressionStmt>;
+    using Node = std::variant<PrintStmt, BlockStmt, VarStmt, ExpressionStmt, IfStmt>;
 
     Node node;
-    
+
     template<class T>
     explicit Stmt(T value)
         : node(std::move(value)) {

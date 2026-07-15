@@ -48,6 +48,7 @@ private:
     StmtPtr expression_statement();
     StmtPtr print_statement();
     StmtPtr block_statement();
+    StmtPtr if_statement();
 
     std::vector<StmtPtr> block();
 
@@ -59,9 +60,12 @@ private:
     ExprPtr variable();
     ExprPtr grouping();
     ExprPtr unary();
+    ExprPtr array_literal();
 
     // Infix-правила: токен продолжает левое выражение
     ExprPtr binary(ExprPtr left);
+    ExprPtr assignment(ExprPtr left);
+    ExprPtr call(ExprPtr callee);
 
     static const ParseRule& get_rule(TokenType type);
     static Precedence next_precedence(Precedence precedence);

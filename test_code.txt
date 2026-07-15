@@ -1,11 +1,20 @@
 var result = 0;
-var numbers[];
+var numbers[] = {1, 2 + 3, 4};
 
-print(result, "hello");
+result = result + 10;
+
+print(result, numbers);
+sum(numbers, result);
 
 {
-    var inner = 10;
+    var inner = 42;
     print(inner);
 }
 
-1 + 2 * 3;
+if (true) {
+    if (false)
+        print("first");
+     else {
+        print("second");
+    }
+}

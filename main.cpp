@@ -51,10 +51,9 @@ int main() {
         Parser parser(std::move(tokens));
         Program program = parser.parse();
 
-        std::cout
-            << "Parsed "
-            << program.size()
-            << " top-level statements\n";
+        std::cout << "Parsed " << program.size() << " top-level statements\n";
+        AstPrinter printer;
+        std::cout << printer.print(program);
 
     } catch (const std::exception& exception) {
         std::cerr << exception.what() << '\n';
