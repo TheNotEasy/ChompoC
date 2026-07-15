@@ -1,6 +1,6 @@
 #include "lexer.h"
 
-//#include <utility>
+#include <utility>
 #include <unordered_map>
 #include <stdexcept>
 
@@ -19,6 +19,7 @@ namespace {
         {"true", TokenType::True},
         {"false", TokenType::False},
         {"NULL", TokenType::Null},
+        {"in", TokenType::In},
     };
 }
 
