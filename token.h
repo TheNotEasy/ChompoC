@@ -6,14 +6,20 @@
 enum class TokenType {
     LeftParen, // (
     RightParen, // )
+    LeftBrace, // {
+    RightBrace, // }
+    LeftBracket, // [
+    RightBracket, // ]
     Semicolon, // ;
     Comma, // ,
     Dot, // .
+    Colon, // :
 
     Plus, // +
     Minus, // -
     Star, // *
     Slash, // /
+    Percent, // %
 
     Equal, // =
     EqualEqual, //==
@@ -23,6 +29,8 @@ enum class TokenType {
     LessEqual, // <=
     Greater, // >
     GreaterEqual, // >=
+    AndAnd, // &&
+    OrOr, // ||
 
     // Литералы и имена
     Identifier,
@@ -33,6 +41,18 @@ enum class TokenType {
     Let,
     Print,
     EndOfFile,
+    Return,
+    Continue,
+    Break,
+    If,
+    Else,
+    While,
+    For,
+    True,
+    False,
+    Null,
+    Fun,
+    In,
 };
 
 struct SourcePosition {
