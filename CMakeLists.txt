@@ -19,5 +19,6 @@ add_executable(Chompo main.cpp
         runtime_error.cpp
         environment.h
         environment.cpp
-        interpreter.h
-        interpreter.cpp)
+        #interpreter.h
+        #interpreter.cpp
+        )
