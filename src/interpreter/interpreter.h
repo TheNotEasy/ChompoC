@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../parser/ast.h"
+#include "parser/ast.h"
 #include "environment.h"
 #include "value.h"
 

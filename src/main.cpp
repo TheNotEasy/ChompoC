@@ -5,15 +5,34 @@
 #include "interpreter/interpreter.h"
 
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <filesystem>
 
-constexpr std::string read_file(const std::string& path) {
+std::filesystem::path find_file(const std::filesystem::path& relative_path) {
+    std::filesystem::path directory = std::filesystem::current_path();
+
+    while (true) {
+        const std::filesystem::path candidate = directory / relative_path;
+        if (std::filesystem::is_regular_file(candidate)) return candidate;
+
+        const std::filesystem::path parent = directory.parent_path();
+        if (parent == directory) break;
+
+        directory = parent;
+    }
+
+    throw std::runtime_error(
+        "Failed to find source file: " + relative_path.string() +
+        "\nWorking directory: " + std::filesystem::current_path().string()
+    );
+}
+
+std::string read_file(const std::filesystem::path& path) {
     std::ifstream file(path);
 
     if (!file) {
@@ -29,22 +48,23 @@ constexpr std::string read_file(const std::string& path) {
     return buffer.str();
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     try {
-        std::string source;
-        try {
-            source = read_file("./src/test_code.chmp");
-        } catch (...) {
-            std::cerr << "Failed to read test_code.chmp\nPlease enter the way to file: ";
-            std::string way;
-            std::cin >> way;
-            source = read_file(way);
-        }
+        const std::filesystem::path source_path = argc > 1
+            ? std::filesystem::path(argv[1])
+            : find_file("test_code.chmp");
+
+        const std::string source = read_file(source_path);
+
+        std::cout << "Source file: "
+                  << std::filesystem::absolute(source_path).string()
+                  << "\n\n";
 
         Lexer lexer(source);
-        const auto tokens = lexer.scan_tokens();
+        auto tokens = lexer.scan_tokens();
 
         std::cout << "====== Lexer ======\n";
+
         for (const Token& token : tokens) {
             std::cout
                 << token.position.line
@@ -57,19 +77,23 @@ int main() {
                 << std::quoted(token.lexeme)
                 << '\n';
         }
+
         std::cout << "====== Parser ======\n";
 
         Parser parser(std::move(tokens));
         Program program = parser.parse();
 
-        std::cout << "Parsed " << program.size() << " top-level statements\n";
+        std::cout << "Parsed "
+                  << program.size()
+                  << " top-level statements\n";
+
         AstPrinter printer;
         std::cout << printer.print(program);
-        std::cout << "======= Output =======\n";
+
+        std::cout << "====== Output ======\n";
 
         Interpreter interpreter(std::cout);
         interpreter.interpret(program);
-
     } catch (const std::exception& exception) {
         std::cerr << exception.what() << '\n';
         return 1;
