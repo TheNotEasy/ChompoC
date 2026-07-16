@@ -29,8 +29,8 @@ private:
         Primary
     };
 
-    using PrefixFunction = ExprPtr (Parser::*)();
-    using InfixFunction = ExprPtr (Parser::*)(ExprPtr left);
+    using PrefixFunction = ExprPtr(Parser::*)();
+    using InfixFunction = ExprPtr(Parser::*)(ExprPtr left);
 
     struct ParseRule {
         PrefixFunction prefix = nullptr;

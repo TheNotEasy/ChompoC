@@ -6,18 +6,20 @@
 #include <string_view>
 #include <vector>
 
-class Lexer {
+class Lexer
+{
 public:
     explicit Lexer(std::string source);
 
     std::vector<Token> scan_tokens();
+
 private:
     std::string source_;
     std::vector<Token> tokens_;
 
     std::size_t start_ = 0, current_ = 0;
-    SourcePosition start_position_{1, 1};
-    SourcePosition current_position_{1, 1};
+    SourcePosition start_position_{ 1, 1 };
+    SourcePosition current_position_{ 1, 1 };
 
     bool is_at_end() const;
 
@@ -31,6 +33,7 @@ private:
     void string_literal();
     void add_token(TokenType type);
 
+    static bool is_support_name(std::string_view);
     static bool is_digit(char c);
     static bool is_alpha(char c);
     static bool is_alpha_numeric(char c);

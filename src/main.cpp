@@ -57,8 +57,8 @@ int main(int argc, char* argv[]) {
         const std::string source = read_file(source_path);
 
         std::cout << "Source file: "
-                  << std::filesystem::absolute(source_path).string()
-                  << "\n\n";
+            << std::filesystem::absolute(source_path).string()
+            << "\n\n";
 
         Lexer lexer(source);
         auto tokens = lexer.scan_tokens();
@@ -84,8 +84,8 @@ int main(int argc, char* argv[]) {
         Program program = parser.parse();
 
         std::cout << "Parsed "
-                  << program.size()
-                  << " top-level statements\n";
+            << program.size()
+            << " top-level statements\n";
 
         AstPrinter printer;
         std::cout << printer.print(program);
@@ -94,7 +94,8 @@ int main(int argc, char* argv[]) {
 
         Interpreter interpreter(std::cout);
         interpreter.interpret(program);
-    } catch (const std::exception& exception) {
+    }
+    catch (const std::exception& exception) {
         std::cerr << exception.what() << '\n';
         return 1;
     }

@@ -5,7 +5,7 @@
 #include <stdexcept>
 
 namespace {
-    const std::unordered_map<std::string, TokenType> keywords {
+    const std::unordered_map<std::string, TokenType> keywords{
         {"var", TokenType::Var},
         {"print", TokenType::Print},
         {"if", TokenType::If},
@@ -51,7 +51,7 @@ char Lexer::advance() { // if !is_at_end()
 }
 
 void Lexer::add_token(TokenType type) {
-    tokens_.push_back(Token{type, source_.substr(start_, current_ - start_), start_position_});
+    tokens_.push_back(Token{ type, source_.substr(start_, current_ - start_), start_position_ });
 }
 
 std::vector<Token> Lexer::scan_tokens() {
@@ -61,14 +61,25 @@ std::vector<Token> Lexer::scan_tokens() {
 
         scan_token();
     }
-    tokens_.push_back(Token{TokenType::EndOfFile, "", current_position_});
+    tokens_.push_back(Token{ TokenType::EndOfFile, "", current_position_ });
     return tokens_;
 }
+bool Lexer::is_support_name(std::string_view s) {
+    if (s.empty() or !is_alpha(s[0]))
+        return false;
 
+    for (char c : s) {
+        if (!is_alpha_numeric(c)) return false;
+    }
+
+    if (keywords.contains(std::string(s)))
+        return false;
+
+    return true;
+}
 bool Lexer::is_digit(char c) { return c >= '0' && c <= '9'; }
 bool Lexer::is_alpha(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_'); }
 bool Lexer::is_alpha_numeric(char c) { return is_alpha(c) || is_digit(c); }
-
 bool Lexer::match(char c) {
     if (peek() != c) return false;
     advance();
@@ -112,123 +123,144 @@ void Lexer::string_literal() {
 void Lexer::scan_token() {
     const char c = advance();
     switch (c) {
-        case '(':
-            add_token(TokenType::LeftParen);
-            break;
+    case '(':
+        add_token(TokenType::LeftParen);
+        break;
 
-        case ')':
-            add_token(TokenType::RightParen);
-            break;
+    case ')':
+        add_token(TokenType::RightParen);
+        break;
 
-        case '{':
-            add_token(TokenType::LeftBrace);
-            break;
+    case '{':
+        add_token(TokenType::LeftBrace);
+        break;
 
-        case '}':
-            add_token(TokenType::RightBrace);
-            break;
+    case '}':
+        add_token(TokenType::RightBrace);
+        break;
 
-        case '[':
-            add_token(TokenType::LeftBracket);
-            break;
+    case '[':
+        add_token(TokenType::LeftBracket);
+        break;
 
-        case ']':
-            add_token(TokenType::RightBracket);
-            break;
+    case ']':
+        add_token(TokenType::RightBracket);
+        break;
 
-        case ';':
-            add_token(TokenType::Semicolon);
-            break;
+    case ';':
+        add_token(TokenType::Semicolon);
+        break;
 
-        case ':':
-            add_token(TokenType::Colon);
-            break;
+    case ':':
+        add_token(TokenType::Colon);
+        break;
 
-        case ',':
-            add_token(TokenType::Comma);
-            break;
+    case ',':
+        add_token(TokenType::Comma);
+        break;
 
-        case '.':
-            add_token(TokenType::Dot);
-            break;
+    case '.':
+        add_token(TokenType::Dot);
+        break;
 
-        case '+':
-            add_token(TokenType::Plus);
-            break;
+    case '++':
+        add_token(TokenType::PlusOne);
+        break;
+    case '--':
+        add_token(TokenType::MinusOne);
+        break;
 
-        case '-':
-            add_token(TokenType::Minus);
-            break;
+    case '+=':
+        add_token(TokenType::PlusEq);
+        break;
+    case '-=':
+        add_token(TokenType::MinusEq);
+        break;
+    case '*=':
+        add_token(TokenType::PowEq);
+        break;
+    case '/=':
+        add_token(TokenType::DivideEq);
+        break;
 
-        case '*':
-            add_token(TokenType::Star);
-            break;
+    case '+':
+        add_token(TokenType::Plus);
+        break;
 
-        case '/':
-            if (match('/')) {
-                while (peek() != '\n' && !is_at_end()) {
-                    advance();
-                }
-            } else {
-                add_token(TokenType::Slash);
+    case '-':
+        add_token(TokenType::Minus);
+        break;
+
+    case '*':
+        add_token(TokenType::Star);
+        break;
+
+    case '/':
+        if (match('/')) {
+            while (peek() != '\n' && !is_at_end()) {
+                advance();
             }
-            break;
+        }
+        else {
+            add_token(TokenType::Slash);
+        }
+        break;
 
-        case '%':
-            add_token(TokenType::Percent);
-            break;
+    case '%':
+        add_token(TokenType::Percent);
+        break;
 
-        case '=':
-            if (match('=')) add_token(TokenType::EqualEqual);
-            else add_token(TokenType::Equal);
-            break;
+    case '=':
+        if (match('=')) add_token(TokenType::EqualEqual);
+        else add_token(TokenType::Equal);
+        break;
 
-        case '!':
-            if (match('=')) add_token(TokenType::NotEqual);
-            else add_token(TokenType::Not);
-            break;
+    case '!':
+        if (match('=')) add_token(TokenType::NotEqual);
+        else add_token(TokenType::Not);
+        break;
 
-        case '<':
-            if (match('=')) add_token(TokenType::LessEqual);
-            else add_token(TokenType::Less);
-            break;
+    case '<':
+        if (match('=')) add_token(TokenType::LessEqual);
+        else add_token(TokenType::Less);
+        break;
 
-        case '>':
-            if (match('=')) add_token(TokenType::GreaterEqual);
-            else add_token(TokenType::Greater);
-            break;
+    case '>':
+        if (match('=')) add_token(TokenType::GreaterEqual);
+        else add_token(TokenType::Greater);
+        break;
 
-        case '"':
-            string_literal();
-            break;
+    case '"':
+        string_literal();
+        break;
 
-        case '&':
-            if (!match('&')) error("expected '&' after '&'");
-            else add_token(TokenType::AndAnd);
-            break;
+    case '&':
+        if (!match('&')) error("expected '&' after '&'");
+        else add_token(TokenType::AndAnd);
+        break;
 
-        case '|':
-            if (!match('|')) error("expected '|' after '|'");
-            else add_token(TokenType::OrOr);
-            break;
+    case '|':
+        if (!match('|')) error("expected '|' after '|'");
+        else add_token(TokenType::OrOr);
+        break;
 
-        case ' ':
-        case '\t':
-        case '\r':
-        case '\n':
-            break;
+    case ' ':
+    case '\t':
+    case '\r':
+    case '\n':
+        break;
 
-        default:
-            if (is_digit(c)) {
-                number();
-            }
-            else if (is_alpha(c)) {
-                identifier();
-            }
-            else {
-                error(std::string("invalid character '") + c + "'");
-            }
-            break;
+    default:
+        if (is_digit(c)) {
+            number();
+        }
+        else if (is_alpha(c)) {
+            identifier();
+        }
+        else {
+            error(std::string("invalid character '") + c + "'");
+        }
+        break;
     }
 }
 

@@ -39,13 +39,13 @@ std::string AstPrinter::print_node(const VariableExpr& expression) const {
     return expression.name.lexeme;
 }
 std::string AstPrinter::print_node(const UnaryExpr& expression) const {
-    return parenthesize(expression.operation.lexeme, {expression.right.get()});
+    return parenthesize(expression.operation.lexeme, { expression.right.get() });
 }
 std::string AstPrinter::print_node(const BinaryExpr& expression) const {
-    return parenthesize(expression.operation.lexeme, {expression.left.get(), expression.right.get()});
+    return parenthesize(expression.operation.lexeme, { expression.left.get(), expression.right.get() });
 }
 std::string AstPrinter::print_node(const GroupingExpr& expression) const {
-    return parenthesize("group", {expression.expression.get()});
+    return parenthesize("group", { expression.expression.get() });
 }
 std::string AstPrinter::print_node(const AssignmentExpr& expression) const {
     std::string result = "(= ";
@@ -80,14 +80,15 @@ std::string AstPrinter::print_node(const ArrayExpr& expression) const {
     return result;
 }
 std::string AstPrinter::print_node(const ExpressionStmt& statement) const {
-    return parenthesize("expr", {statement.expression.get()});
+    return parenthesize("expr", { statement.expression.get() });
 }
 std::string AstPrinter::print_node(const VarStmt& statement) const {
     std::string result;
 
     if (statement.is_array) {
         result = "(var-array ";
-    } else {
+    }
+    else {
         result = "(var ";
     }
 
@@ -96,9 +97,11 @@ std::string AstPrinter::print_node(const VarStmt& statement) const {
     if (statement.initializer) {
         result += " ";
         result += print(*statement.initializer);
-    } else if (statement.is_array) {
+    }
+    else if (statement.is_array) {
         result += " (array)";
-    } else {
+    }
+    else {
         result += " NULL";
     }
 
@@ -144,7 +147,7 @@ std::string AstPrinter::print_node(
     return result;
 }
 
-std::string AstPrinter::parenthesize(std::string_view name,std::initializer_list<const Expr*> expressions) const {
+std::string AstPrinter::parenthesize(std::string_view name, std::initializer_list<const Expr*> expressions) const {
     std::string result = "(";
     result += name;
 
