@@ -9,6 +9,7 @@
 #include <system_error>
 #include <utility>
 #include <variant>
+#include <ranges>
 
 namespace {
     std::int64_t parse_integer(const Token& token) {
@@ -76,7 +77,14 @@ namespace {
         if (left.is_bool()) return std::get<bool>(left.data) == std::get<bool>(right.data);
         if (left.is_integer()) return std::get<std::int64_t>(left.data) == std::get<std::int64_t>(right.data);
         if (left.is_string()) return std::get<std::string>(left.data) == std::get<std::string>(right.data);
-        if (left.is_array())  return std::get<ArrayPtr>(left.data) == std::get<ArrayPtr>(right.data); // ? {1} != {1}
+        if (left.is_array()) {
+            if (std::get<ArrayPtr>(left.data) == std::get<ArrayPtr>(right.data)) return false;
+            if (std::get<ArrayPtr>(left.data)->size() != std::get<ArrayPtr>(right.data)->size()) return false;
+            for (auto&& [LeftEl, RightEl] : std::views::zip(*std::get<ArrayPtr>(left.data), *std::get<ArrayPtr>(right.data))) {
+                if (!values_equal(LeftEl, RightEl)) return false;
+            }
+            return true;
+        }
         return false;
     }
 
@@ -166,17 +174,116 @@ Value Interpreter::evaluate_node(const UnaryExpr& expression) {
 
 Value Interpreter::evaluate_node(const BinaryExpr& expression) {
     const Value left = evaluate(*expression.left);
+
+    if (expression.operation.type == TokenType::AndAnd) {
+        if (!left.is_truthy()) return Value(false);
+        return Value(evaluate(*expression.right).is_truthy());
+    }
+
+    if (expression.operation.type == TokenType::OrOr) {
+        if (left.is_truthy()) return Value(true);
+        return Value(evaluate(*expression.right).is_truthy());
+    }
+
     const Value right = evaluate(*expression.right);
 
     switch (expression.operation.type) {
-        case TokenType::AndAnd:
-            return Value(left.is_truthy() && right.is_truthy());
-        case TokenType::OrOr:
-            return Value(left.is_truthy() || right.is_truthy());
+        case TokenType::EqualEqual:
+            return Value(values_equal(left, right));
+
+        case TokenType::NotEqual:
+            return Value(!values_equal(left, right));
+
+        case TokenType::Plus:
+            if (left.is_integer() && right.is_integer()) {
+                return Value(std::get<std::int64_t>(left.data) +
+                    std::get<std::int64_t>(right.data));
+            }
+
+            if (left.is_string() && right.is_string()) {
+                return Value(std::get<std::string>(left.data) +
+                    std::get<std::string>(right.data));
+            }
+
+            binary_type_error(expression.operation, left, right);
+
+        case TokenType::Minus:
+            if (!left.is_integer() || !right.is_integer()) {
+                binary_type_error(expression.operation, left, right);
+            }
+
+            return Value(std::get<std::int64_t>(left.data) -
+                std::get<std::int64_t>(right.data));
+
+        case TokenType::Star:
+            if (!left.is_integer() || !right.is_integer()) {
+                binary_type_error(expression.operation, left, right);
+            }
+
+            return Value(std::get<std::int64_t>(left.data) *
+                std::get<std::int64_t>(right.data));
+
+        case TokenType::Slash: {
+            if (!left.is_integer() || !right.is_integer()) {
+                binary_type_error(expression.operation, left, right);
+            }
+
+            const std::int64_t left_integer = std::get<std::int64_t>(left.data);
+            const std::int64_t right_integer = std::get<std::int64_t>(right.data);
+
+            if (right_integer == 0) {
+                throw RuntimeError(expression.operation, "division by zero");
+            }
+
+            return Value(left_integer / right_integer);
+        }
+
+        case TokenType::Percent: {
+            if (!left.is_integer() || !right.is_integer()) {
+                binary_type_error(expression.operation, left, right);
+            }
+
+            const std::int64_t left_integer = std::get<std::int64_t>(left.data);
+            const std::int64_t right_integer = std::get<std::int64_t>(right.data);
+
+            if (right_integer == 0) {
+                throw RuntimeError(expression.operation, "division by zero");
+            }
+
+            return Value(left_integer % right_integer);
+        }
+
+        case TokenType::Less:
+        case TokenType::LessEqual:
+        case TokenType::Greater:
+        case TokenType::GreaterEqual: {
+            if (!left.is_integer() || !right.is_integer()) {
+                binary_type_error(expression.operation, left, right);
+            }
+
+            const std::int64_t left_integer = std::get<std::int64_t>(left.data);
+            const std::int64_t right_integer = std::get<std::int64_t>(right.data);
+
+            switch (expression.operation.type) {
+                case TokenType::Less:
+                    return Value(left_integer < right_integer);
+                case TokenType::LessEqual:
+                    return Value(left_integer <= right_integer);
+                case TokenType::Greater:
+                    return Value(left_integer > right_integer);
+                case TokenType::GreaterEqual:
+                    return Value(left_integer >= right_integer);
+                default:
+                    break;
+            }
+
+            break;
+        }
+
         default:
-            throw RuntimeError(expression.operation, "Interpreter: unknown binary operator '" +
+            throw RuntimeError(expression.operation, "unknown binary operator '" +
                 expression.operation.lexeme + "'");
     }
 
-    // Остальные бинарные операторы будут ниже
+    throw RuntimeError(expression.operation, "invalid binary operation");
 }
