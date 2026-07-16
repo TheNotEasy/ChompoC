@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
     try {
         const std::filesystem::path source_path = argc > 1
             ? std::filesystem::path(argv[1])
-            : find_file("test_code.chmp");
+            : find_file("tests/test_code.chmp");
 
         const std::string source = read_file(source_path);
 
