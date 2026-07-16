@@ -1,7 +1,7 @@
 #pragma once
 
 #include "runtime_error.h"
-#include "token.h"
+#include "../lexer/token.h"
 #include "value.h"
 
 #include <memory>

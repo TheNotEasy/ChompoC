@@ -1,8 +1,8 @@
-#include "lexer.h"
-#include "token.h"
-#include "parser.h"
-#include "ast_printer.h"
-#include "interpreter.h"
+#include "lexer/lexer.h"
+#include "lexer/token.h"
+#include "parser/parser.h"
+#include "parser/ast_printer.h"
+#include "interpreter/interpreter.h"
 
 #include <exception>
 #include <fstream>
@@ -13,7 +13,7 @@
 #include <string>
 #include <filesystem>
 
-std::string read_file(const std::string& path) {
+constexpr std::string read_file(const std::string& path) {
     std::ifstream file(path);
 
     if (!file) {
@@ -31,11 +31,20 @@ std::string read_file(const std::string& path) {
 
 int main() {
     try {
-        const std::string source = read_file("./../test_code.txt");
+        std::string source;
+        try {
+            source = read_file("./src/test_code.chmp");
+        } catch (...) {
+            std::cerr << "Failed to read test_code.chmp\nPlease enter the way to file: ";
+            std::string way;
+            std::cin >> way;
+            source = read_file(way);
+        }
 
         Lexer lexer(source);
         const auto tokens = lexer.scan_tokens();
 
+        std::cout << "====== Lexer ======\n";
         for (const Token& token : tokens) {
             std::cout
                 << token.position.line
@@ -48,6 +57,7 @@ int main() {
                 << std::quoted(token.lexeme)
                 << '\n';
         }
+        std::cout << "====== Parser ======\n";
 
         Parser parser(std::move(tokens));
         Program program = parser.parse();
@@ -55,6 +65,7 @@ int main() {
         std::cout << "Parsed " << program.size() << " top-level statements\n";
         AstPrinter printer;
         std::cout << printer.print(program);
+        std::cout << "======= Output =======\n";
 
         Interpreter interpreter(std::cout);
         interpreter.interpret(program);
