@@ -6,8 +6,7 @@
 #include <string_view>
 #include <vector>
 
-class Lexer
-{
+class Lexer {
 public:
     explicit Lexer(std::string source);
 
@@ -18,8 +17,8 @@ private:
     std::vector<Token> tokens_;
 
     std::size_t start_ = 0, current_ = 0;
-    SourcePosition start_position_{ 1, 1 };
-    SourcePosition current_position_{ 1, 1 };
+    SourcePosition start_position_{1, 1};
+    SourcePosition current_position_{1, 1};
 
     bool is_at_end() const;
 
