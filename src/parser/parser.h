@@ -13,6 +13,7 @@ public:
     explicit Parser(std::vector<Token> tokens);
 
     Program parse();
+
 private:
     enum class Precedence {
         None,
@@ -67,17 +68,17 @@ private:
     ExprPtr assignment(ExprPtr left);
     ExprPtr call(ExprPtr callee);
 
-    static const ParseRule& get_rule(TokenType type);
+    static const ParseRule &get_rule(TokenType type);
     static Precedence next_precedence(Precedence precedence);
 
     bool match(std::initializer_list<TokenType> types);
     bool check(TokenType type) const;
     bool is_at_end() const;
 
-    const Token& advance();
-    const Token& peek() const;
-    const Token& previous() const;
+    const Token &advance();
+    const Token &peek() const;
+    const Token &previous() const;
 
-    const Token& consume(TokenType type, std::string_view message);
-    [[noreturn]] void error(const Token& token, std::string_view message) const;
+    const Token &consume(TokenType type, std::string_view message);
+    [[noreturn]] void error(const Token &token, std::string_view message) const;
 };

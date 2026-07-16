@@ -11,9 +11,9 @@ class Environment {
 public:
     explicit Environment(std::shared_ptr<Environment> parent = nullptr);
 
-    void define(const Token& name, Value value);
-    Value get(const Token& name) const;
-    void assign(const Token& name, Value value);
+    void define(const Token &name, Value value);
+    Value get(const Token &name) const;
+    void assign(const Token &name, Value value);
 
     std::shared_ptr<Environment> parent() const;
 

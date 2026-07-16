@@ -1,37 +1,45 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <string_view>
-#include <cstddef>
 
 enum class TokenType {
-    LeftParen, // (
-    RightParen, // )
-    LeftBrace, // {
-    RightBrace, // }
-    LeftBracket, // [
+    LeftParen,    // (
+    RightParen,   // )
+    LeftBrace,    // {
+    RightBrace,   // }
+    LeftBracket,  // [
     RightBracket, // ]
-    Semicolon, // ;
-    Comma, // ,
-    Dot, // .
-    Colon, // :
+    Semicolon,    // ;
+    Comma,        // ,
+    Dot,          // .
+    Colon,        // :
 
-    Plus, // +
-    Minus, // -
-    Star, // *
-    Slash, // /
+    PlusOne,  // ++
+    MinusOne, // --
+
+    PlusEq,   // +=
+    MinusEq,  // -=
+    PowEq,    // *=
+    DivideEq, // /=
+
+    Plus,    // +
+    Minus,   // -
+    Star,    // *
+    Slash,   // /
     Percent, // %
 
-    Equal, // =
-    EqualEqual, //==
-    NotEqual, // !=
-    Not, // !
-    Less, // <
-    LessEqual, // <=
-    Greater, // >
+    Equal,        // =
+    EqualEqual,   //==
+    NotEqual,     // !=
+    Not,          // !
+    Less,         // <
+    LessEqual,    // <=
+    Greater,      // >
     GreaterEqual, // >=
-    AndAnd, // &&
-    OrOr, // ||
+    AndAnd,       // &&
+    OrOr,         // ||
 
     // Литералы и имена
     Identifier,
@@ -53,9 +61,8 @@ enum class TokenType {
     False,
     Null,
     Fun,
+    Class,
     In,
-
-
 
     Count
 };

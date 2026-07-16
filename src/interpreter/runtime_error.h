@@ -7,5 +7,5 @@
 
 class RuntimeError : public std::runtime_error {
 public:
-    RuntimeError(const Token& token, std::string_view message);
+    RuntimeError(const Token &token, std::string_view message);
 };

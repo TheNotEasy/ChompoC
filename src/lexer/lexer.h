@@ -11,6 +11,7 @@ public:
     explicit Lexer(std::string source);
 
     std::vector<Token> scan_tokens();
+
 private:
     std::string source_;
     std::vector<Token> tokens_;
@@ -31,6 +32,7 @@ private:
     void string_literal();
     void add_token(TokenType type);
 
+    static bool is_support_name(std::string_view);
     static bool is_digit(char c);
     static bool is_alpha(char c);
     static bool is_alpha_numeric(char c);
