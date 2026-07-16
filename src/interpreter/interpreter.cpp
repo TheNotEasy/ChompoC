@@ -73,8 +73,17 @@ namespace {
         return result;
     }
     bool values_equal(const Value &left, const Value &right) {
+        if (left.is_number() && right.is_number()) {
+            if (left.is_double() || right.is_double()) {
+                return left.number_as_double() == right.number_as_double();
+            }
+
+            return left.number_as_integer() == right.number_as_integer();
+        }
+
         if (left.data.index() != right.data.index())
             return false;
+
         if (left.is_null())
             return true;
 
@@ -106,6 +115,11 @@ namespace {
             return true;
         }
         return false;
+    }
+
+    bool can_convert_to_string_implicitly(const Value &value) {
+        return value.is_null() || value.is_bool() || value.is_number() ||
+               value.is_string();
     }
 
     [[noreturn]] void binary_type_error(const Token &operation,
