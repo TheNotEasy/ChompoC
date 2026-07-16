@@ -44,7 +44,7 @@ std::string Value::to_string() const {
         if (!*array) {
             return "{}";
         }
-        
+
         std::string result = "{";
         for (std::size_t index = 0; index < (*array)->size(); ++index) {
             if (index > 0) {
