@@ -103,3 +103,80 @@ void Interpreter::execute(const Stmt& statement) {
     std::visit([this](const auto& node) { execute_node(node); }, statement.node);
 }
 
+Value Interpreter::evaluate_node(const LiteralExpr& expression) {
+    const Token& token = expression.value;
+    switch (token.type) {
+        case TokenType::Number:
+            return Value(parse_integer(token));
+        case TokenType::String:
+            return Value(parse_string(token));
+        case TokenType::True:
+            return Value(true);
+        case TokenType::False:
+            return Value(false);
+        case TokenType::Null:
+            return Value(nullptr);
+        default:
+            throw RuntimeError(token, "invalid literal");
+    }
+}
+
+Value Interpreter::evaluate_node(const VariableExpr& expression) {
+    return environment_->get(expression.name);
+}
+
+Value Interpreter::evaluate_node(const GroupingExpr& expression) {
+    return evaluate(*expression.expression);
+}
+
+Value Interpreter::evaluate_node(const AssignmentExpr& expression) {
+    Value value = evaluate(*expression.value);
+    environment_->assign(expression.name, value);
+    return value;
+}
+
+Value Interpreter::evaluate_node(const ArrayExpr& expression) {
+    auto array = std::make_shared<ArrayValue>();
+    array->reserve(expression.elements.size());
+    for (const ExprPtr& element : expression.elements) {
+        array->push_back(evaluate(*element));
+    }
+    return Value(std::move(array));
+}
+
+Value Interpreter::evaluate_node(const UnaryExpr& expression) {
+    const Value right = evaluate(*expression.right);
+
+    switch (expression.operation.type) {
+        case TokenType::Minus:
+            if (!right.is_integer()) {
+                throw RuntimeError(expression.operation,
+                    "operator '-' requires an integer operand, got " + right.type_name());
+            }
+            return Value(-std::get<std::int64_t>(right.data));
+
+        case TokenType::Not:
+            return Value(!right.is_truthy());
+
+        default:
+            throw RuntimeError(expression.operation,
+                "Interpretator: unknown unary operator '" + expression.operation.lexeme + "'");
+    }
+}
+
+Value Interpreter::evaluate_node(const BinaryExpr& expression) {
+    const Value left = evaluate(*expression.left);
+    const Value right = evaluate(*expression.right);
+
+    switch (expression.operation.type) {
+        case TokenType::AndAnd:
+            return Value(left.is_truthy() && right.is_truthy());
+        case TokenType::OrOr:
+            return Value(left.is_truthy() || right.is_truthy());
+        default:
+            throw RuntimeError(expression.operation, "Interpreter: unknown binary operator '" +
+                expression.operation.lexeme + "'");
+    }
+
+    // Остальные бинарные операторы будут ниже
+}
