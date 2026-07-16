@@ -227,6 +227,9 @@ Value Interpreter::evaluate_node(const AssignmentExpr &expression) {
                                "operator '/=' cannot be applied to " +
                                    left_val.type_name() + " and " +
                                    right_val.type_name());
+    } else {
+        throw RuntimeError(expression.op, "unknown assignment operator '" +
+                                              expression.op.lexeme + "'");
     }
     environment_->assign(expression.name, res);
 

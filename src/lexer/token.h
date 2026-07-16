@@ -16,8 +16,8 @@ enum class TokenType {
     Dot,          // .
     Colon,        // :
 
-    //PlusOne,  // ++
-    //MinusOne, // --
+    PlusOne,  // ++
+    MinusOne, // --
 
     PlusEq,   // +=
     MinusEq,  // -=

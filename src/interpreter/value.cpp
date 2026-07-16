@@ -22,6 +22,9 @@ bool Value::is_string() const {
     return std::holds_alternative<std::string>(data);
 }
 bool Value::is_array() const { return std::holds_alternative<ArrayPtr>(data); }
+bool Value::is_double() const {
+    return std::holds_alternative<double>(data);
+}
 
 bool Value::is_truthy() const {
     if (is_null())

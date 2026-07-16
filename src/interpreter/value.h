@@ -13,7 +13,7 @@ using ArrayPtr = std::shared_ptr<ArrayValue>;
 
 struct Value {
     using Storage = std::variant<std::monostate, // NULL
-                                 bool, std::int64_t, std::string, ArrayPtr>;
+                                 bool, std::int64_t, std::string, ArrayPtr, double>;
 
     Storage data;
 
@@ -24,12 +24,14 @@ struct Value {
     Value(std::string value);
     Value(const char *value);
     Value(ArrayPtr value);
+    Value(double value);
 
     bool is_null() const;
     bool is_bool() const;
     bool is_integer() const;
     bool is_string() const;
     bool is_array() const;
+    bool is_double() const;
 
     bool is_truthy() const;
 

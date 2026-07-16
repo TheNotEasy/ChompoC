@@ -124,9 +124,11 @@ void Lexer::string_literal() {
         if (peek() == '\\') {
             advance();
 
-            if (is_at_end()) {
+            if (is_at_end())
                 error("unfinished escape sequence");
-            }
+
+            if (peek() == '\n')
+                error("line break after '\\' is not allowed");
 
             advance();
             continue;
