@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ast.h"
-#include "token.h"
+#include "lexer/token.h"
 
 #include <cstddef>
 #include <initializer_list>
