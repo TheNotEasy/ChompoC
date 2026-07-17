@@ -37,9 +37,9 @@ public:
 
 private:
     std::string name_;
-    Function function_;
     std::size_t min_arity_;
     std::size_t max_arity_;
+    Function function_;
 };
 
 class UserFunction final : public Callable {

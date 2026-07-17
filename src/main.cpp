@@ -49,16 +49,16 @@ std::string read_file(const std::filesystem::path &path) {
 int main(int argc, char *argv[]) {
     try {
         const std::filesystem::path source_path =
-            argc > 1 ? std::filesystem::path(argv[1]) : find_file("tests/cases/test_code.chmp");
+            argc > 1 ? std::filesystem::path(argv[1]) : find_file("tests/test_code.chmp");
 
         const std::string source = read_file(source_path);
-        if (ChompoConfig::EnableDebugOutput) {
+        if constexpr (ChompoConfig::EnableDebugOutput) {
             std::cout << "Source file: " << std::filesystem::absolute(source_path).string() << "\n\n";
         }
         Lexer lexer(source);
         auto tokens = lexer.scan_tokens();
 
-        if (ChompoConfig::EnableDebugOutput) {
+        if constexpr (ChompoConfig::EnableDebugOutput) {
             std::cout << "====== Lexer ======\n";
 
             for (const Token &token : tokens) {
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
         Parser parser(std::move(tokens));
         Program program = parser.parse();
 
-        if (ChompoConfig::EnableDebugOutput) {
+        if constexpr (ChompoConfig::EnableDebugOutput) {
             std::cout << "====== Parser ======\n";
             std::cout << "Parsed " << program.size() << " top-level statements\n";
 
