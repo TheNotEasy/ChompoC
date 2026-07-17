@@ -64,13 +64,17 @@ private:
     ExprPtr variable();
     ExprPtr grouping();
     ExprPtr unary();
+
     ExprPtr array_literal();
     ExprPtr array_expression();
+    ExprPtr prefix_update();
 
     // Infix-правила: токен продолжает левое выражение
     ExprPtr binary(ExprPtr left);
     ExprPtr assignment(ExprPtr left);
     ExprPtr call(ExprPtr callee);
+    ExprPtr index(ExprPtr object);
+    ExprPtr postfix_update(ExprPtr target);
 
     static const ParseRule &get_rule(TokenType type);
     static Precedence next_precedence(Precedence precedence);

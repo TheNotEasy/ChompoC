@@ -168,6 +168,29 @@ namespace {
         return false;
     }
 
+    Value concatenate_arrays(const ArrayPtr &left, const ArrayPtr &right) {
+        auto result = std::make_shared<ArrayValue>();
+
+        const std::size_t left_size = left ? left->size() : 0;
+
+        const std::size_t right_size = right ? right->size() : 0;
+
+        if (right_size > result->max_size() - left_size) {
+            throw std::length_error("array concatenation is too large");
+        }
+
+        result->reserve(left_size + right_size);
+
+        if (left) {
+            result->insert(result->end(), left->begin(), left->end());
+        }
+
+        if (right) {
+            result->insert(result->end(), right->begin(), right->end());
+        }
+
+        return Value(std::move(result));
+    }
     Value repeat_string(const Token &operation, const std::string &string, std::int64_t count) {
         if (count < 0) {
             throw RuntimeError(operation, "string multiplication count cannot be negative");
@@ -177,6 +200,31 @@ namespace {
 
         for (std::int64_t index = 0; index < count; ++index)
             result += string;
+
+        return Value(std::move(result));
+    }
+    Value repeat_array(const Token &operation, const ArrayPtr &array, std::int64_t count) {
+        if (count < 0) {
+            throw RuntimeError(operation, "array multiplication count "
+                                          "cannot be negative");
+        }
+
+        auto result = std::make_shared<ArrayValue>();
+
+        if (!array || array->empty() || count == 0)
+            return Value(std::move(result));
+
+        const std::size_t repeats = static_cast<std::size_t>(count);
+
+        if (repeats > result->max_size() / array->size()) {
+            throw RuntimeError(operation, "repeated array is too large");
+        }
+
+        result->reserve(repeats * array->size());
+
+        for (std::size_t repeat = 0; repeat < repeats; ++repeat) {
+            result->insert(result->end(), array->begin(), array->end());
+        }
 
         return Value(std::move(result));
     }
@@ -199,16 +247,20 @@ namespace {
         case TokenType::DivideEq:
             return TokenType::Slash;
 
+        case TokenType::PlusOne:
+            return TokenType::Plus;
+
+        case TokenType::MinusOne:
+            return TokenType::Minus;
+
         default:
             return type;
         }
     }
-
     [[noreturn]] void binary_type_error(const Token &operation, const Value &left, const Value &right) {
         throw RuntimeError(operation, "operator '" + operation.lexeme + "' cannot be applied to " + left.type_name() +
                                           " and " + right.type_name());
     }
-
     Value apply_binary(const Token &operation, const Value &left, const Value &right) {
         const TokenType type = binary_operator_type(operation.type);
 
@@ -225,6 +277,9 @@ namespace {
 
             return Value(left.to_string() + right.to_string());
         }
+        if (type == TokenType::Plus && left.is_array() && right.is_array()) {
+            return concatenate_arrays(std::get<ArrayPtr>(left.data), std::get<ArrayPtr>(right.data));
+        }
 
         if (type == TokenType::Star) {
             if (left.is_string() && right.is_integer_number()) {
@@ -233,6 +288,14 @@ namespace {
 
             if (right.is_string() && left.is_integer_number()) {
                 return repeat_string(operation, std::get<std::string>(right.data), left.number_as_integer());
+            }
+
+            if (left.is_array() && right.is_integer_number()) {
+                return repeat_array(operation, std::get<ArrayPtr>(left.data), right.number_as_integer());
+            }
+
+            if (right.is_array() && left.is_integer_number()) {
+                return repeat_array(operation, std::get<ArrayPtr>(right.data), left.number_as_integer());
             }
         }
 
@@ -445,7 +508,8 @@ namespace {
             return Value(std::move(result));
         }
 
-        throw RuntimeError(token, "cannot convert " + value.type_name() + " to array");
+
+        return Value(std::make_shared<ArrayValue>(std::vector<Value>{std::move(value)}));
     }
     Value convert_char_array_to_string(const Token &token, const Value &value) {
         if (!value.is_array()) {
@@ -476,6 +540,41 @@ namespace {
 
     CallablePtr make_native(std::string name, NativeFunction::Function function) {
         return std::make_shared<NativeFunction>(std::move(name), 1, std::move(function));
+    }
+
+    Value sequence_length(const Token &token, const Value &value) {
+        std::size_t size = 0;
+
+        if (value.is_string()) {
+            size = std::get<std::string>(value.data).size();
+        } else if (value.is_array()) {
+            const ArrayPtr &array = std::get<ArrayPtr>(value.data);
+
+            size = array ? array->size() : 0;
+        } else {
+            throw RuntimeError(token, "len requires string or array, got " + value.type_name());
+        }
+
+        if (size > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max())) {
+            throw RuntimeError(token, "sequence is too large to represent its length");
+        }
+
+        return Value(static_cast<std::int64_t>(size));
+    }
+
+    std::size_t checked_index(const Token &token, const Value &value, std::size_t size) {
+        if (!value.is_integer_number()) {
+            throw RuntimeError(token, "sequence index must be an integer, got " + value.type_name());
+        }
+
+        const std::int64_t index = value.number_as_integer();
+
+        if (index < 0 || static_cast<std::uint64_t>(index) >= static_cast<std::uint64_t>(size)) {
+            throw RuntimeError(token, "index " + std::to_string(index) + " is out of range for sequence of size " +
+                                          std::to_string(size));
+        }
+
+        return static_cast<std::size_t>(index);
     }
 } // namespace
 
@@ -509,6 +608,9 @@ Interpreter::Interpreter(std::ostream &output)
 
     globals_->define("CATS", Value(make_native("CATS", [](const Token &token, const std::vector<Value> &arguments) {
                          return convert_char_array_to_string(token, arguments[0]);
+                     })));
+    globals_->define("len", Value(make_native("len", [](const Token &token, const std::vector<Value> &arguments) {
+                         return sequence_length(token, arguments[0]);
                      })));
 }
 
@@ -548,17 +650,33 @@ Value Interpreter::evaluate_node(const LiteralExpr &expression) {
 Value Interpreter::evaluate_node(const VariableExpr &expression) { return environment_->get(expression.name); }
 Value Interpreter::evaluate_node(const GroupingExpr &expression) { return evaluate(*expression.expression); }
 Value Interpreter::evaluate_node(const AssignmentExpr &expression) {
+    ResolvedTarget target = resolve_target(*expression.target);
+
     const Value right = evaluate(*expression.value);
 
     if (expression.op.type == TokenType::Equal) {
-        environment_->assign(expression.name, right);
+        target.write(right);
         return right;
     }
 
-    const Value left = environment_->get(expression.name);
-    const Value result = apply_binary(expression.op, left, right);
+    Value result = apply_binary(expression.op, target.value, right);
 
-    environment_->assign(expression.name, result);
+    if (target.value.is_char()) {
+        if (!result.is_integer_number()) {
+            throw RuntimeError(expression.op, "compound assignment on char must "
+                                              "produce an integer");
+        }
+
+        const std::int64_t code = result.number_as_integer();
+
+        if (code < 0 || code > 255) {
+            throw RuntimeError(expression.op, "char value is outside range 0..255");
+        }
+
+        result = Value(static_cast<char>(static_cast<unsigned char>(code)));
+    }
+
+    target.write(result);
     return result;
 }
 Value Interpreter::evaluate_node(const ArrayExpr &expression) {
@@ -640,7 +758,63 @@ Value Interpreter::evaluate_node(const CallExpr &expression) {
 
     return callable->call(*this, expression.closing_parenthesis, arguments);
 }
+Value Interpreter::evaluate_node(const IndexExpr &expression) {
+    const Value object = evaluate(*expression.object);
 
+    const Value index = evaluate(*expression.index);
+
+    if (object.is_array()) {
+        const ArrayPtr &array = std::get<ArrayPtr>(object.data);
+
+        const std::size_t size = array ? array->size() : 0;
+
+        const std::size_t position = checked_index(expression.bracket, index, size);
+
+        return (*array)[position];
+    }
+
+    if (object.is_string()) {
+        const std::string &string = std::get<std::string>(object.data);
+
+        const std::size_t position = checked_index(expression.bracket, index, string.size());
+
+        return Value(string[position]);
+    }
+
+    throw RuntimeError(expression.bracket, "operator '[]' cannot be applied to " + object.type_name());
+}
+Value Interpreter::evaluate_node(const UpdateExpr &expression) {
+    ResolvedTarget target = resolve_target(*expression.target);
+
+    if (!target.value.is_number()) {
+        throw RuntimeError(expression.operation, "operator '" + expression.operation.lexeme +
+                                                     "' requires a numeric target, got " + target.value.type_name());
+    }
+
+    const Value previous = target.value;
+
+    Value updated = apply_binary(expression.operation, previous, Value(std::int64_t{1}));
+
+    if (previous.is_char()) {
+        const std::int64_t code = updated.number_as_integer();
+
+        if (code < 0 || code > 255) {
+            throw RuntimeError(expression.operation, "char increment or decrement "
+                                                     "is outside range 0..255");
+        }
+
+        updated = Value(static_cast<char>(static_cast<unsigned char>(code)));
+    }
+
+    target.write(updated);
+
+    if (expression.prefix)
+        return updated;
+
+    return previous;
+}
+
+void Interpreter::execute_node(const EmptyStmt &) {}
 void Interpreter::execute_node(const ExpressionStmt &statement) { evaluate(*statement.expression); }
 void Interpreter::execute_node(const VarStmt &statement) {
     Value value(nullptr);
@@ -692,4 +866,58 @@ void Interpreter::execute_block(const std::vector<StmtPtr> &statements, std::sha
         throw;
     }
     environment_ = previous;
+}
+Interpreter::ResolvedTarget Interpreter::resolve_target(const Expr &expression) {
+    if (const auto *variable = std::get_if<VariableExpr>(&expression.node)) {
+        const Token name = variable->name;
+
+        return ResolvedTarget{environment_->get(name),
+                              [this, name](Value value) { environment_->assign(name, std::move(value)); }};
+    }
+
+    const auto *index = std::get_if<IndexExpr>(&expression.node);
+
+    if (!index)
+        throw std::logic_error("invalid assignment target");
+
+    ResolvedTarget object = resolve_target(*index->object);
+
+    const Value index_value = evaluate(*index->index);
+
+    if (object.value.is_array()) {
+        const ArrayPtr array = std::get<ArrayPtr>(object.value.data);
+
+        const std::size_t size = array ? array->size() : 0;
+
+        const std::size_t position = checked_index(index->bracket, index_value, size);
+
+        return ResolvedTarget{(*array)[position],
+                              [array, position](Value value) { (*array)[position] = std::move(value); }};
+    }
+
+    if (object.value.is_string()) {
+        std::string string = std::get<std::string>(object.value.data);
+
+        const std::size_t position = checked_index(index->bracket, index_value, string.size());
+
+        Value current(string[position]);
+
+        auto write_parent = std::move(object.write);
+
+        const Token bracket = index->bracket;
+
+        return ResolvedTarget{
+            std::move(current), [string = std::move(string), position, write_parent = std::move(write_parent),
+                                 bracket](Value value) mutable {
+                if (!value.is_char()) {
+                    throw RuntimeError(bracket, "string element must be char, got " + value.type_name());
+                }
+
+                string[position] = std::get<char>(value.data);
+
+                write_parent(Value(string));
+            }};
+    }
+
+    throw RuntimeError(index->bracket, "operator '[]' cannot be applied to " + object.value.type_name());
 }

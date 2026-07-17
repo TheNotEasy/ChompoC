@@ -4,6 +4,7 @@
 #include "parser/ast.h"
 #include "value.h"
 
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -12,6 +13,7 @@ class UserFunction;
 
 class Interpreter {
     friend class UserFunction;
+
 public:
     explicit Interpreter(std::ostream &output);
 
@@ -27,6 +29,11 @@ private:
     void execute(const Stmt &statement);
 
     void execute_block(const std::vector<StmtPtr> &statements, std::shared_ptr<Environment> environment);
+    struct ResolvedTarget {
+        Value value;
+        std::function<void(Value)> write;
+    };
+    ResolvedTarget resolve_target(const Expr &expression);
 
     // Выражения
     Value evaluate_node(const LiteralExpr &expression);
@@ -37,8 +44,11 @@ private:
     Value evaluate_node(const AssignmentExpr &expression);
     Value evaluate_node(const CallExpr &expression);
     Value evaluate_node(const ArrayExpr &expression);
+    Value evaluate_node(const IndexExpr &expression);
+    Value evaluate_node(const UpdateExpr &expression);
 
     // Инструкции
+    void execute_node(const EmptyStmt &);
     void execute_node(const ExpressionStmt &statement);
     void execute_node(const VarStmt &statement);
     void execute_node(const PrintStmt &statement);

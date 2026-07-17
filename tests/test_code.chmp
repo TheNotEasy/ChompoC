@@ -109,3 +109,33 @@ var constructor = Array;
 print(constructor("xy"), "\n");
 
 var x = Array{1, 2};
+
+var array = Array{10, 20, 30};
+var text = "abc";
+
+print("lengths: ",
+      len(array), " ",
+      len(text), "\n");
+
+print(array[1], "\n");
+print(text[1], "\n");
+
+array[0]++;
+++array[1];
+
+text[0]++;
+text[1] = 'X';
+
+print(array, "\n");
+print(text, "\n");
+
+print(Array(Array{1, 2}[0]) + Array{3, 4}, "\n");
+print(Array{1, 2} * 3, "\n");
+
+{
+var x = 5;
+    print(x++, " ", x, "\n");
+    print(++x, " ", x, "\n");
+
+    ;;;
+}

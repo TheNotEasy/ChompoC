@@ -34,13 +34,7 @@ std::string AstPrinter::print_node(const GroupingExpr &expression) const {
     return parenthesize("group", {expression.expression.get()});
 }
 std::string AstPrinter::print_node(const AssignmentExpr &expression) const {
-    std::string result = "(= ";
-    result += expression.name.lexeme;
-    result += " ";
-    result += print(*expression.value);
-    result += ")";
-
-    return result;
+    return parenthesize(expression.op.lexeme, {expression.target.get(), expression.value.get()});
 }
 std::string AstPrinter::print_node(const CallExpr &expression) const {
     std::string result = "(call ";
@@ -65,11 +59,22 @@ std::string AstPrinter::print_node(const ArrayExpr &expression) const {
     result += ")";
     return result;
 }
+std::string AstPrinter::print_node(const IndexExpr &expression) const {
+    return parenthesize("index", {expression.object.get(), expression.index.get()});
+}
+std::string AstPrinter::print_node(const UpdateExpr &expression) const {
+    std::string name = expression.prefix ? "prefix" : "postfix";
+
+    name += expression.operation.lexeme;
+
+    return parenthesize(name, {expression.target.get()});
+}
+
+std::string AstPrinter::print_node(const EmptyStmt &) const { return "(empty)"; }
 std::string AstPrinter::print_node(const ExpressionStmt &statement) const {
     return parenthesize("expr", {statement.expression.get()});
 }
-std::string AstPrinter::print_node(
-    const VarStmt &statement) const {
+std::string AstPrinter::print_node(const VarStmt &statement) const {
     std::string result = "(var ";
     result += statement.name.lexeme;
 
@@ -119,7 +124,6 @@ std::string AstPrinter::print_node(const IfStmt &statement) const {
     result += ")";
     return result;
 }
-
 std::string AstPrinter::print_node(const FunctionStmt &statement) const {
     std::string result = "(fun ";
     result += statement.name.lexeme;
@@ -142,7 +146,6 @@ std::string AstPrinter::print_node(const FunctionStmt &statement) const {
     result += ")";
     return result;
 }
-
 std::string AstPrinter::print_node(const ReturnStmt &statement) const {
     if (!statement.value)
         return "(return)";
