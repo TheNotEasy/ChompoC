@@ -37,6 +37,26 @@ string(REPLACE "\r\n" "\n"
         "${expected_output}"
 )
 
+string(REGEX REPLACE "[\r\n]+$" ""
+        actual_output
+        "${actual_output}"
+)
+
+string(REGEX REPLACE "[\r\n]+$" ""
+        expected_output
+        "${expected_output}"
+)
+
+string(REPLACE "\r\n" "\n"
+        actual_output
+        "${actual_output}"
+)
+
+string(REPLACE "\r\n" "\n"
+        expected_output
+        "${expected_output}"
+)
+
 if(USE_STDERR)
     string(FIND
             "${actual_output}"
