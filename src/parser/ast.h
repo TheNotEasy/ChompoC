@@ -69,7 +69,6 @@ struct ExpressionStmt {
 
 struct VarStmt {
     Token name;
-    bool is_array;
     ExprPtr initializer;
 };
 

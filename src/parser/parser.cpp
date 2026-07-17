@@ -85,13 +85,9 @@ const Parser::ParseRule &Parser::get_rule(TokenType type) {
         result[token_index(TokenType::Not)] = {&Parser::unary, nullptr, Precedence::None};
         // += -= *= /=
         result[token_index(TokenType::PlusEq)] = {nullptr, &Parser::assignment, Precedence::Assignment};
-
         result[token_index(TokenType::MinusEq)] = {nullptr, &Parser::assignment, Precedence::Assignment};
-
         result[token_index(TokenType::MulEq)] = {nullptr, &Parser::assignment, Precedence::Assignment};
-
         result[token_index(TokenType::DivideEq)] = {nullptr, &Parser::assignment, Precedence::Assignment};
-
         // Сложение
         result[token_index(TokenType::Plus)] = {nullptr, &Parser::binary, Precedence::Term};
         // Умножение, деление, остаток
@@ -243,21 +239,14 @@ StmtPtr Parser::declaration() {
 StmtPtr Parser::var_declaration() {
     const Token name = consume(TokenType::Identifier, "expected variable name after 'var'");
 
-    bool is_array = false;
-    if (match({TokenType::LeftBracket})) {
-        consume(TokenType::RightBracket, "expected ']' after '[' in array declaration");
-        is_array = true;
-    }
-
     ExprPtr initializer;
 
-    if (match({TokenType::Equal})) {
+    if (match({TokenType::Equal}))
         initializer = expression();
-    }
 
     consume(TokenType::Semicolon, "expected ';' after variable declaration");
 
-    return std::make_unique<Stmt>(VarStmt{name, is_array, std::move(initializer)});
+    return std::make_unique<Stmt>(VarStmt{name, std::move(initializer)});
 }
 StmtPtr Parser::function_declaration() {
     const Token name = consume(TokenType::Identifier, "expected function name after 'fun'");

@@ -68,22 +68,14 @@ std::string AstPrinter::print_node(const ArrayExpr &expression) const {
 std::string AstPrinter::print_node(const ExpressionStmt &statement) const {
     return parenthesize("expr", {statement.expression.get()});
 }
-std::string AstPrinter::print_node(const VarStmt &statement) const {
-    std::string result;
-
-    if (statement.is_array) {
-        result = "(var-array ";
-    } else {
-        result = "(var ";
-    }
-
+std::string AstPrinter::print_node(
+    const VarStmt &statement) const {
+    std::string result = "(var ";
     result += statement.name.lexeme;
 
     if (statement.initializer) {
         result += " ";
         result += print(*statement.initializer);
-    } else if (statement.is_array) {
-        result += " (array)";
     } else {
         result += " NULL";
     }

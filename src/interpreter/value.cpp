@@ -14,7 +14,7 @@ Value::Value(std::int64_t value) : data(value) {}
 Value::Value(std::string value) : data(std::move(value)) {}
 Value::Value(const char *value) : data(std::string(value)) {}
 Value::Value(double value) : data(value) {}
-Value::Value(CallablePtr callable) : data(callable) {}
+Value::Value(CallablePtr callable) : data(std::move(callable)) {}
 Value::Value(char value) : data(value) {}
 
 bool Value::is_null() const { return std::holds_alternative<std::monostate>(data); }

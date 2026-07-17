@@ -643,13 +643,10 @@ Value Interpreter::evaluate_node(const CallExpr &expression) {
 
 void Interpreter::execute_node(const ExpressionStmt &statement) { evaluate(*statement.expression); }
 void Interpreter::execute_node(const VarStmt &statement) {
-    Value value = statement.is_array ? Value(std::make_shared<ArrayValue>()) : Value(nullptr);
+    Value value(nullptr);
 
     if (statement.initializer)
         value = evaluate(*statement.initializer);
-    if (statement.is_array && !value.is_array()) {
-        throw RuntimeError(statement.name, "array variable requires an array initializer");
-    }
 
     environment_->define(statement.name, std::move(value));
 }
