@@ -9,30 +9,37 @@
 
 namespace {
     constexpr std::size_t token_index(TokenType type) { return static_cast<std::size_t>(type); }
+
+    bool is_assignment_target(const Expr &expression) {
+        if (std::holds_alternative<VariableExpr>(expression.node)) {
+            return true;
+        }
+
+        if (const auto *index = std::get_if<IndexExpr>(&expression.node)) {
+            return is_assignment_target(*index->object);
+        }
+
+        return false;
+    }
 } // namespace
+
+Parser::Parser(std::vector<Token> tokens) : tokens_(std::move(tokens)) {}
 
 Parser::Precedence Parser::next_precedence(Precedence precedence) {
     return static_cast<Precedence>(static_cast<int>(precedence) + 1);
 }
-
-Parser::Parser(std::vector<Token> tokens) : tokens_(std::move(tokens)) {}
-
 const Token &Parser::peek() const {
     if (current_ >= tokens_.size())
         return tokens_.back();
     return tokens_[current_];
 }
-
 const Token &Parser::previous() const { return tokens_[current_ - 1]; }
-
 const Token &Parser::advance() {
     if (current_ < tokens_.size())
         ++current_;
     return previous();
 }
-
 bool Parser::check(TokenType type) const { return peek().type == type; }
-
 bool Parser::match(std::initializer_list<TokenType> types) {
     for (const TokenType type : types) {
         if (check(type)) {
@@ -42,15 +49,12 @@ bool Parser::match(std::initializer_list<TokenType> types) {
     }
     return false;
 }
-
 bool Parser::is_at_end() const { return current_ >= tokens_.size() || peek().type == TokenType::EndOfFile; }
-
 const Token &Parser::consume(TokenType type, std::string_view message) {
     if (check(type))
         return advance();
     error(peek(), message);
 }
-
 [[noreturn]] void Parser::error(const Token &token, std::string_view message) const {
     std::string location;
 
@@ -75,42 +79,36 @@ const Parser::ParseRule &Parser::get_rule(TokenType type) {
         result[token_index(TokenType::True)] = {&Parser::literal, nullptr, Precedence::None};
         result[token_index(TokenType::False)] = {&Parser::literal, nullptr, Precedence::None};
         result[token_index(TokenType::Null)] = {&Parser::literal, nullptr, Precedence::None};
-        // Имя переменной
+        result[token_index(TokenType::Char)] = {&Parser::literal, nullptr, Precedence::None};
+        result[token_index(TokenType::Array)] = {&Parser::array_expression, nullptr, Precedence::None};
         result[token_index(TokenType::Identifier)] = {&Parser::variable, nullptr, Precedence::None};
-        // (expression)
+
         result[token_index(TokenType::LeftParen)] = {&Parser::grouping, &Parser::call, Precedence::Call};
-        // -value и left - right
-        result[token_index(TokenType::Minus)] = {&Parser::unary, &Parser::binary, Precedence::Term};
-        // !value
-        result[token_index(TokenType::Not)] = {&Parser::unary, nullptr, Precedence::None};
-        // += -= *= /=
+        result[token_index(TokenType::LeftBracket)] = {nullptr, &Parser::index, Precedence::Call};
+
         result[token_index(TokenType::PlusEq)] = {nullptr, &Parser::assignment, Precedence::Assignment};
-
         result[token_index(TokenType::MinusEq)] = {nullptr, &Parser::assignment, Precedence::Assignment};
-
         result[token_index(TokenType::MulEq)] = {nullptr, &Parser::assignment, Precedence::Assignment};
-
         result[token_index(TokenType::DivideEq)] = {nullptr, &Parser::assignment, Precedence::Assignment};
+        result[token_index(TokenType::PlusOne)] = {&Parser::prefix_update, &Parser::postfix_update, Precedence::Call};
+        result[token_index(TokenType::MinusOne)] = {&Parser::prefix_update, &Parser::postfix_update, Precedence::Call};
 
-        // Сложение
+        result[token_index(TokenType::Minus)] = {&Parser::unary, &Parser::binary, Precedence::Term};
         result[token_index(TokenType::Plus)] = {nullptr, &Parser::binary, Precedence::Term};
-        // Умножение, деление, остаток
         result[token_index(TokenType::Star)] = {nullptr, &Parser::binary, Precedence::Factor};
         result[token_index(TokenType::Slash)] = {nullptr, &Parser::binary, Precedence::Factor};
         result[token_index(TokenType::Percent)] = {nullptr, &Parser::binary, Precedence::Factor};
-        // Сравнения
+
+        result[token_index(TokenType::Not)] = {&Parser::unary, nullptr, Precedence::None};
         result[token_index(TokenType::Less)] = {nullptr, &Parser::binary, Precedence::Comparison};
         result[token_index(TokenType::LessEqual)] = {nullptr, &Parser::binary, Precedence::Comparison};
         result[token_index(TokenType::Greater)] = {nullptr, &Parser::binary, Precedence::Comparison};
         result[token_index(TokenType::GreaterEqual)] = {nullptr, &Parser::binary, Precedence::Comparison};
-        // Равенство
         result[token_index(TokenType::EqualEqual)] = {nullptr, &Parser::binary, Precedence::Equality};
         result[token_index(TokenType::NotEqual)] = {nullptr, &Parser::binary, Precedence::Equality};
-        // Логические операции
         result[token_index(TokenType::AndAnd)] = {nullptr, &Parser::binary, Precedence::And};
         result[token_index(TokenType::OrOr)] = {nullptr, &Parser::binary, Precedence::Or};
         result[token_index(TokenType::Equal)] = {nullptr, &Parser::assignment, Precedence::Assignment};
-        result[token_index(TokenType::LeftBrace)] = {&Parser::array_literal, nullptr, Precedence::None};
 
         return result;
     }();
@@ -172,6 +170,14 @@ ExprPtr Parser::array_literal() {
     consume(TokenType::RightBrace, "expected '}' after array elements");
     return std::make_unique<Expr>(ArrayExpr{std::move(elements)});
 }
+ExprPtr Parser::array_expression() {
+    const Token name = previous();
+
+    if (match({TokenType::LeftBrace}))
+        return array_literal();
+
+    return std::make_unique<Expr>(VariableExpr{name});
+}
 
 ExprPtr Parser::binary(ExprPtr left) {
     const Token operation = previous();
@@ -181,21 +187,17 @@ ExprPtr Parser::binary(ExprPtr left) {
     ExprPtr right = parse_precedence(next_precedence(precedence));
     return std::make_unique<Expr>(BinaryExpr(std::move(left), operation, std::move(right)));
 }
-
-ExprPtr Parser::assignment(ExprPtr left) {
+ExprPtr Parser::assignment(ExprPtr target) {
     const Token operation = previous();
-    const auto *variable = std::get_if<VariableExpr>(&left->node);
 
-    if (variable == nullptr)
+    if (!is_assignment_target(*target)) {
         error(operation, "invalid assignment target");
-
-    const Token name = variable->name;
+    }
 
     ExprPtr value = parse_precedence(Precedence::Assignment);
 
-    return std::make_unique<Expr>(AssignmentExpr{name, operation, std::move(value)});
+    return std::make_unique<Expr>(AssignmentExpr{std::move(target), operation, std::move(value)});
 }
-
 ExprPtr Parser::call(ExprPtr callee) {
     std::vector<ExprPtr> arguments;
 
@@ -212,7 +214,6 @@ ExprPtr Parser::call(ExprPtr callee) {
 
     return std::make_unique<Expr>(CallExpr{std::move(callee), closing_parenthesis, std::move(arguments)});
 }
-
 Program Parser::parse() {
     Program program;
 
@@ -221,6 +222,35 @@ Program Parser::parse() {
     }
 
     return program;
+}
+ExprPtr Parser::index(ExprPtr object) {
+    const Token bracket = previous();
+
+    ExprPtr index_value = expression();
+
+    consume(TokenType::RightBracket, "expected ']' after sequence index");
+
+    return std::make_unique<Expr>(IndexExpr{std::move(object), bracket, std::move(index_value)});
+}
+ExprPtr Parser::prefix_update() {
+    const Token operation = previous();
+
+    ExprPtr target = parse_precedence(Precedence::Unary);
+
+    if (!is_assignment_target(*target)) {
+        error(operation, "invalid increment or decrement target");
+    }
+
+    return std::make_unique<Expr>(UpdateExpr{std::move(target), operation, true});
+}
+ExprPtr Parser::postfix_update(ExprPtr target) {
+    const Token operation = previous();
+
+    if (!is_assignment_target(*target)) {
+        error(operation, "invalid increment or decrement target");
+    }
+
+    return std::make_unique<Expr>(UpdateExpr{std::move(target), operation, false});
 }
 
 StmtPtr Parser::declaration() {
@@ -235,58 +265,42 @@ StmtPtr Parser::declaration() {
 StmtPtr Parser::var_declaration() {
     const Token name = consume(TokenType::Identifier, "expected variable name after 'var'");
 
-    bool is_array = false;
-    if (match({TokenType::LeftBracket})) {
-        consume(TokenType::RightBracket, "expected ']' after '[' in array declaration");
-        is_array = true;
-    }
-
     ExprPtr initializer;
 
-    if (match({TokenType::Equal})) {
+    if (match({TokenType::Equal}))
         initializer = expression();
-    }
 
     consume(TokenType::Semicolon, "expected ';' after variable declaration");
 
-    return std::make_unique<Stmt>(VarStmt{name, is_array, std::move(initializer)});
+    return std::make_unique<Stmt>(VarStmt{name, std::move(initializer)});
 }
 StmtPtr Parser::function_declaration() {
-    const Token name =
-        consume(TokenType::Identifier, "expected function name after 'fun'");
+    const Token name = consume(TokenType::Identifier, "expected function name after 'fun'");
 
-    consume(TokenType::LeftParen,
-            "expected '(' after function name");
+    consume(TokenType::LeftParen, "expected '(' after function name");
 
     std::vector<Token> parameters;
 
     if (!check(TokenType::RightParen)) {
         do {
-            parameters.push_back(
-                consume(TokenType::Identifier,
-                        "expected parameter name"));
+            parameters.push_back(consume(TokenType::Identifier, "expected parameter name"));
         } while (match({TokenType::Comma}));
     }
 
-    consume(TokenType::RightParen,
-            "expected ')' after function parameters");
+    consume(TokenType::RightParen, "expected ')' after function parameters");
 
-    consume(TokenType::LeftBrace,
-            "expected '{' before function body");
+    consume(TokenType::LeftBrace, "expected '{' before function body");
 
     ++function_depth_;
     std::vector<StmtPtr> body = block();
     --function_depth_;
 
-    return std::make_unique<Stmt>(
-        FunctionStmt{
-            name,
-            std::move(parameters),
-            std::move(body)
-        });
+    return std::make_unique<Stmt>(FunctionStmt{name, std::move(parameters), std::move(body)});
 }
 
 StmtPtr Parser::statement() {
+    if (match({TokenType::Semicolon}))
+        return std::make_unique<Stmt>(EmptyStmt{});
     if (match({TokenType::Print}))
         return print_statement();
     if (match({TokenType::LeftBrace}))
@@ -325,11 +339,9 @@ StmtPtr Parser::return_statement() {
     if (!check(TokenType::Semicolon))
         value = expression();
 
-    consume(TokenType::Semicolon,
-            "expected ';' after return value");
+    consume(TokenType::Semicolon, "expected ';' after return value");
 
-    return std::make_unique<Stmt>(
-        ReturnStmt{keyword, std::move(value)});
+    return std::make_unique<Stmt>(ReturnStmt{keyword, std::move(value)});
 }
 StmtPtr Parser::expression_statement() {
     ExprPtr value = expression();
