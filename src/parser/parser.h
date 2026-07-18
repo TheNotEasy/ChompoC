@@ -42,6 +42,7 @@ private:
     std::vector<Token> tokens_;
     std::size_t current_ = 0;
     std::size_t function_depth_ = 0;
+    std::size_t loop_depth_ = 0;
 
     StmtPtr declaration();
     StmtPtr var_declaration();
@@ -53,6 +54,10 @@ private:
     StmtPtr block_statement();
     StmtPtr if_statement();
     StmtPtr return_statement();
+    StmtPtr while_statement();
+    StmtPtr break_statement();
+    StmtPtr continue_statement();
+    StmtPtr for_in_statement();
 
     std::vector<StmtPtr> block();
 
@@ -64,12 +69,17 @@ private:
     ExprPtr variable();
     ExprPtr grouping();
     ExprPtr unary();
+
     ExprPtr array_literal();
+    ExprPtr array_expression();
+    ExprPtr prefix_update();
 
     // Infix-правила: токен продолжает левое выражение
     ExprPtr binary(ExprPtr left);
     ExprPtr assignment(ExprPtr left);
     ExprPtr call(ExprPtr callee);
+    ExprPtr index(ExprPtr object);
+    ExprPtr postfix_update(ExprPtr target);
 
     static const ParseRule &get_rule(TokenType type);
     static Precedence next_precedence(Precedence precedence);

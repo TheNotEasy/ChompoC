@@ -34,7 +34,7 @@ struct GroupingExpr {
 };
 
 struct AssignmentExpr {
-    Token name;
+    ExprPtr target;
     Token op;
     ExprPtr value;
 };
@@ -49,9 +49,21 @@ struct ArrayExpr {
     std::vector<ExprPtr> elements;
 };
 
+struct IndexExpr {
+    ExprPtr object;
+    Token bracket;
+    ExprPtr index;
+};
+
+struct UpdateExpr {
+    ExprPtr target;
+    Token operation;
+    bool prefix;
+};
+
 struct Expr {
     using Node = std::variant<LiteralExpr, UnaryExpr, BinaryExpr, GroupingExpr, VariableExpr, AssignmentExpr, CallExpr,
-                              ArrayExpr>;
+                              ArrayExpr, IndexExpr, UpdateExpr>;
 
     Node node;
 
@@ -63,13 +75,14 @@ struct Stmt;
 using StmtPtr = std::unique_ptr<Stmt>;
 using Program = std::vector<StmtPtr>;
 
+struct EmptyStmt {};
+
 struct ExpressionStmt {
     ExprPtr expression;
 };
 
 struct VarStmt {
     Token name;
-    bool is_array;
     ExprPtr initializer;
 };
 
@@ -87,6 +100,20 @@ struct IfStmt {
     StmtPtr else_branch;
 };
 
+struct WhileStmt {
+    Token keyword;
+    ExprPtr condition;
+    StmtPtr body;
+};
+
+struct BreakStmt {
+    Token keyword;
+};
+
+struct ContinueStmt {
+    Token keyword;
+};
+
 struct FunctionStmt {
     Token name;
     std::vector<Token> parameters;
@@ -98,8 +125,16 @@ struct ReturnStmt {
     ExprPtr value;
 };
 
+struct ForInStmt {
+    Token keyword;
+    Token variable;
+    ExprPtr iterable;
+    StmtPtr body;
+};
+
 struct Stmt {
-    using Node = std::variant<PrintStmt, BlockStmt, VarStmt, ExpressionStmt, IfStmt, FunctionStmt, ReturnStmt>;
+    using Node = std::variant<EmptyStmt, PrintStmt, BlockStmt, VarStmt, ExpressionStmt, IfStmt, WhileStmt, BreakStmt,
+                              ContinueStmt, FunctionStmt, ReturnStmt, ForInStmt>;
 
     Node node;
 
