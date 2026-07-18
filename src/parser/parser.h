@@ -57,6 +57,7 @@ private:
     StmtPtr while_statement();
     StmtPtr break_statement();
     StmtPtr continue_statement();
+    StmtPtr for_in_statement();
 
     std::vector<StmtPtr> block();
 

@@ -978,6 +978,44 @@ void Interpreter::execute_block(const std::vector<StmtPtr> &statements, std::sha
     }
     environment_ = previous;
 }
+void Interpreter::execute_node(const ForInStmt &statement) {
+    const Value iterable = evaluate(*statement.iterable);
+
+    std::vector<Value> snapshot;
+
+    if (iterable.is_array()) {
+        const ArrayPtr &array = std::get<ArrayPtr>(iterable.data);
+
+        if (array)
+            snapshot = *array;
+    } else if (iterable.is_string()) {
+        const std::string &string = std::get<std::string>(iterable.data);
+
+        snapshot.reserve(string.size());
+
+        for (const char character : string)
+            snapshot.emplace_back(character);
+    } else {
+        throw RuntimeError(statement.keyword, "for-in requires array or string, got " + iterable.type_name());
+    }
+
+    const std::shared_ptr<Environment> loop_environment = environment_;
+
+    for (Value element : snapshot) {
+        auto iteration_environment = std::make_shared<Environment>(loop_environment);
+
+        iteration_environment->define(statement.variable, std::move(element));
+
+        try {
+            execute_in_environment(*statement.body, std::move(iteration_environment));
+        } catch (const ContinueSignal &) {
+            continue;
+        } catch (const BreakSignal &) {
+            break;
+        }
+    }
+}
+
 Interpreter::ResolvedTarget Interpreter::resolve_target(const Expr &expression) {
     if (const auto *variable = std::get_if<VariableExpr>(&expression.node)) {
         const Token name = variable->name;
@@ -1045,4 +1083,19 @@ void Interpreter::warning(const Token &token, const std::string &message) {
         diagnostics_ << "Runtime warning at " << token.position.line << ":" << token.position.column << ": " << message
                      << '\n';
     }
+}
+
+void Interpreter::execute_in_environment(const Stmt &statement, std::shared_ptr<Environment> environment) {
+    const std::shared_ptr<Environment> previous = environment_;
+
+    environment_ = std::move(environment);
+
+    try {
+        execute(statement);
+    } catch (...) {
+        environment_ = previous;
+        throw;
+    }
+
+    environment_ = previous;
 }

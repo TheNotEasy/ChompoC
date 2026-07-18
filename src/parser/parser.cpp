@@ -323,6 +323,8 @@ StmtPtr Parser::statement() {
         return if_statement();
     if (match({TokenType::While}))
         return while_statement();
+    if (match({TokenType::For}))
+        return for_in_statement();
     if (match({TokenType::Continue}))
         return continue_statement();
     if (match({TokenType::Break}))
@@ -424,4 +426,34 @@ StmtPtr Parser::continue_statement() {
     consume(TokenType::Semicolon, "expected ';' after 'continue'");
 
     return std::make_unique<Stmt>(ContinueStmt{keyword});
+}
+StmtPtr Parser::for_in_statement() {
+    const Token keyword = previous();
+
+    consume(TokenType::LeftParen, "expected '(' after 'for'");
+
+    consume(TokenType::Var, "expected 'var' after '(' in for-in loop");
+
+    const Token variable = consume(TokenType::Identifier, "expected iteration variable name");
+
+    consume(TokenType::In, "expected 'in' after iteration variable");
+
+    ExprPtr iterable = expression();
+
+    consume(TokenType::RightParen, "expected ')' after for-in iterable");
+
+    ++loop_depth_;
+
+    StmtPtr body;
+
+    try {
+        body = statement();
+    } catch (...) {
+        --loop_depth_;
+        throw;
+    }
+
+    --loop_depth_;
+
+    return std::make_unique<Stmt>(ForInStmt{keyword, variable, std::move(iterable), std::move(body)});
 }

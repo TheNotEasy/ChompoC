@@ -125,9 +125,16 @@ struct ReturnStmt {
     ExprPtr value;
 };
 
+struct ForInStmt {
+    Token keyword;
+    Token variable;
+    ExprPtr iterable;
+    StmtPtr body;
+};
+
 struct Stmt {
     using Node = std::variant<EmptyStmt, PrintStmt, BlockStmt, VarStmt, ExpressionStmt, IfStmt, WhileStmt, BreakStmt,
-                              ContinueStmt, FunctionStmt, ReturnStmt>;
+                              ContinueStmt, FunctionStmt, ReturnStmt, ForInStmt>;
 
     Node node;
 

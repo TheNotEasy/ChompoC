@@ -61,6 +61,9 @@ private:
     void execute_node(const WhileStmt &statement);
     void execute_node(const BreakStmt &statement);
     void execute_node(const ContinueStmt &statement);
+    void execute_node(const ForInStmt &statement);
+
+    void execute_in_environment(const Stmt &statement, std::shared_ptr<Environment> environment);
 
     class CallDepthGuard {
     public:

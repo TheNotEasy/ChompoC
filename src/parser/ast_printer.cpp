@@ -163,6 +163,17 @@ std::string AstPrinter::print_node(const ReturnStmt &statement) const {
 
     return parenthesize("return", {statement.value.get()});
 }
+std::string AstPrinter::print_node(const ForInStmt &statement) const {
+    std::string result = "(for-in ";
+    result += statement.variable.lexeme;
+    result += " ";
+    result += print(*statement.iterable);
+    result += " ";
+    result += print(*statement.body);
+    result += ")";
+
+    return result;
+}
 
 std::string AstPrinter::parenthesize(std::string_view name, std::initializer_list<const Expr *> expressions) const {
     std::string result = "(";

@@ -37,6 +37,7 @@ private:
     std::string print_node(const BreakStmt &) const;
     std::string print_node(const ContinueStmt &) const;
     std::string print_node(const ReturnStmt &statement) const;
+    std::string print_node(const ForInStmt &statement) const;
 
     std::string parenthesize(std::string_view name, std::initializer_list<const Expr *> expressions) const;
 };
