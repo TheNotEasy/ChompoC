@@ -124,6 +124,17 @@ std::string AstPrinter::print_node(const IfStmt &statement) const {
     result += ")";
     return result;
 }
+std::string AstPrinter::print_node(const WhileStmt &statement) const {
+    std::string result = "(while ";
+    result += print(*statement.condition);
+    result += " ";
+    result += print(*statement.body);
+    result += ")";
+
+    return result;
+}
+std::string AstPrinter::print_node(const BreakStmt &) const { return "(break)"; }
+std::string AstPrinter::print_node(const ContinueStmt &) const { return "(continue)"; }
 std::string AstPrinter::print_node(const FunctionStmt &statement) const {
     std::string result = "(fun ";
     result += statement.name.lexeme;

@@ -1,6 +1,7 @@
 #include "interpreter.h"
 #include "callable.h"
 #include "config.h"
+#include "loop_signal.h"
 #include "return_signal.h"
 #include "runtime_error.h"
 
@@ -896,6 +897,19 @@ void Interpreter::execute_node(const IfStmt &statement) {
     if (statement.else_branch)
         execute(*statement.else_branch);
 }
+void Interpreter::execute_node(const WhileStmt &statement) {
+    while (evaluate(*statement.condition).is_truthy()) {
+        try {
+            execute(*statement.body);
+        } catch (const ContinueSignal &) {
+            continue;
+        } catch (const BreakSignal &) {
+            break;
+        }
+    }
+}
+void Interpreter::execute_node(const BreakStmt &) { throw BreakSignal{}; }
+void Interpreter::execute_node(const ContinueStmt &) { throw ContinueSignal{}; }
 void Interpreter::execute_node(const FunctionStmt &statement) {
     CallablePtr function = std::make_shared<UserFunction>(statement, environment_);
 

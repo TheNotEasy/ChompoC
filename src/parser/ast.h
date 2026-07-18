@@ -100,6 +100,20 @@ struct IfStmt {
     StmtPtr else_branch;
 };
 
+struct WhileStmt {
+    Token keyword;
+    ExprPtr condition;
+    StmtPtr body;
+};
+
+struct BreakStmt {
+    Token keyword;
+};
+
+struct ContinueStmt {
+    Token keyword;
+};
+
 struct FunctionStmt {
     Token name;
     std::vector<Token> parameters;
@@ -112,7 +126,8 @@ struct ReturnStmt {
 };
 
 struct Stmt {
-    using Node = std::variant<EmptyStmt, PrintStmt, BlockStmt, VarStmt, ExpressionStmt, IfStmt, FunctionStmt, ReturnStmt>;
+    using Node = std::variant<EmptyStmt, PrintStmt, BlockStmt, VarStmt, ExpressionStmt, IfStmt, WhileStmt, BreakStmt,
+                              ContinueStmt, FunctionStmt, ReturnStmt>;
 
     Node node;
 

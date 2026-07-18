@@ -31,6 +31,7 @@ add_executable(Chompo
         src/interpreter/callable.cpp
         src/interpreter/return_signal.h
         src/config.h
+        src/interpreter/loop_signal.h
 )
 
 target_include_directories(Chompo PRIVATE src)
@@ -60,3 +61,6 @@ add_chompo_test(updates 0 FALSE)
 add_chompo_test(stack_overflow 1 TRUE)
 add_chompo_test(direct_array_cycle 1 TRUE)
 add_chompo_test(indirect_array_cycle 1 TRUE)
+add_chompo_test(loops 0 FALSE)
+add_chompo_test(break_outside_loop 1 TRUE)
+add_chompo_test(break_inside_nested_function 1 TRUE)

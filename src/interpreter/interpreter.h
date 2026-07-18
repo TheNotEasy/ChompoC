@@ -58,6 +58,9 @@ private:
     void execute_node(const IfStmt &statement);
     void execute_node(const FunctionStmt &statement);
     void execute_node(const ReturnStmt &statement);
+    void execute_node(const WhileStmt &statement);
+    void execute_node(const BreakStmt &statement);
+    void execute_node(const ContinueStmt &statement);
 
     class CallDepthGuard {
     public:
