@@ -12,7 +12,6 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -36,16 +35,27 @@ std::filesystem::path find_file(const std::filesystem::path &relative_path) {
 }
 
 std::string read_file(const std::filesystem::path &path) {
-    std::ifstream file(path);
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file)
         throw std::runtime_error("Failed to open source file: " + std::filesystem::absolute(path).string());
 
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
+    const std::streampos end = file.tellg();
+    if (end < 0)
+        throw std::runtime_error("Failed to determine source file size: " + path.string());
+
+    std::string source(static_cast<std::size_t>(end), '\0');
+    file.seekg(0, std::ios::beg);
+
+    if (!source.empty() && !file.read(source.data(), static_cast<std::streamsize>(source.size())))
+        throw std::runtime_error("Failed to read source file: " + path.string());
+
+    return source;
 }
 
 int main(int argc, char *argv[]) {
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(nullptr);
+
     try {
         const std::filesystem::path source_path =
             argc > 1 ? std::filesystem::path(argv[1]) : find_file("tests/test_code.chmp");
@@ -78,6 +88,7 @@ int main(int argc, char *argv[]) {
         IOManager io_manager(std::cin, std::cout);
         NetworkManager network_manager;
         Interpreter interpreter(io_manager.output_stream());
+        interpreter.install_collection_builtins();
         interpreter.install_io_builtins(io_manager);
         interpreter.install_network_builtins(network_manager);
         interpreter.interpret(program);

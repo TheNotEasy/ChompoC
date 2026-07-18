@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(CHOMPO_ENABLE_PERFORMANCE_TESTS "Enable heavy Release performance/TLE checks" OFF)
+
 add_executable(Chompo
         src/main.cpp
         src/lexer/token.h src/lexer/token.cpp src/lexer/lexer.h src/lexer/lexer.cpp
@@ -14,14 +16,30 @@ add_executable(Chompo
         src/interpreter/environment.h src/interpreter/environment.cpp
         src/interpreter/interpreter.h src/interpreter/interpreter.cpp
         src/interpreter/callable.h src/interpreter/callable.cpp
+        src/interpreter/collection_builtins.cpp
         src/interpreter/io_manager.h src/interpreter/io_manager.cpp src/interpreter/io_builtins.cpp
         src/interpreter/network_manager.h src/interpreter/network_manager.cpp src/interpreter/network_builtins.cpp
         src/interpreter/return_signal.h src/interpreter/loop_signal.h src/config.h
 )
 
 target_include_directories(Chompo PRIVATE src)
+
+if(MSVC)
+    target_compile_options(Chompo PRIVATE /W4)
+else()
+    target_compile_options(Chompo PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
 if(WIN32)
     target_link_libraries(Chompo PRIVATE ws2_32)
+endif()
+
+include(CheckIPOSupported)
+check_ipo_supported(RESULT CHOMPO_IPO_SUPPORTED OUTPUT CHOMPO_IPO_ERROR)
+if(CHOMPO_IPO_SUPPORTED)
+    set_property(TARGET Chompo PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+else()
+    message(STATUS "Release IPO/LTO is unavailable: ${CHOMPO_IPO_ERROR}")
 endif()
 
 include(CTest)
@@ -54,6 +72,10 @@ add_chompo_test(in_invalid_string_needle 1 TRUE)
 add_chompo_test(continue_outside_loop 1 TRUE)
 add_chompo_test(for_in 0 FALSE)
 add_chompo_test(regression 0 FALSE)
+add_chompo_test(collections 0 FALSE)
+add_chompo_test(push_cycle 1 TRUE)
+add_chompo_test(push_invalid_target 1 TRUE)
+add_chompo_test(pop_invalid_target 1 TRUE)
 
 add_test(NAME error_regressions
         COMMAND ${CMAKE_COMMAND}
@@ -74,8 +96,23 @@ add_executable(network_manager_test
         src/interpreter/network_manager.cpp
         src/interpreter/network_manager.h)
 target_include_directories(network_manager_test PRIVATE src)
+if(MSVC)
+    target_compile_options(network_manager_test PRIVATE /W4)
+else()
+    target_compile_options(network_manager_test PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 if(WIN32)
     target_link_libraries(network_manager_test PRIVATE ws2_32)
 endif()
 add_test(NAME network_manager COMMAND network_manager_test)
 set_tests_properties(network_manager PROPERTIES TIMEOUT 10)
+
+if(CHOMPO_ENABLE_PERFORMANCE_TESTS)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_test(NAME performance_tle
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/performance/run_performance_suite.py
+                    --executable $<TARGET_FILE:Chompo>
+                    --cases ${CMAKE_CURRENT_SOURCE_DIR}/tests/performance/cases)
+    set_tests_properties(performance_tle PROPERTIES LABELS performance TIMEOUT 60)
+endif()

@@ -19,6 +19,7 @@ class Interpreter {
 public:
     Interpreter(std::ostream &output, std::ostream &diagnostics = std::cerr);
 
+    void install_collection_builtins();
     void install_io_builtins(IOManager &io_manager);
     void install_network_builtins(NetworkManager &network_manager);
     void interpret(const Program &program);
