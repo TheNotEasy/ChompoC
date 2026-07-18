@@ -84,12 +84,12 @@ std::string_view token_type_name(TokenType type) {
         return "Print";
     case TokenType::EndOfFile:
         return "EndOfFile";
-    case TokenType::True:
-        return "True";
-    case TokenType::False:
-        return "False";
-    case TokenType::Null:
-        return "Null";
+    case TokenType::Return:
+        return "Return";
+    case TokenType::Continue:
+        return "Continue";
+    case TokenType::Break:
+        return "Break";
     case TokenType::If:
         return "If";
     case TokenType::Else:
@@ -98,18 +98,23 @@ std::string_view token_type_name(TokenType type) {
         return "While";
     case TokenType::For:
         return "For";
-    case TokenType::In:
-        return "In";
-    case TokenType::Break:
-        return "Break";
-    case TokenType::Continue:
-        return "Continue";
+    case TokenType::True:
+        return "True";
+    case TokenType::False:
+        return "False";
+    case TokenType::Null:
+        return "Null";
     case TokenType::Fun:
         return "Fun";
-    case TokenType::Return:
-        return "Return";
+    case TokenType::Class:
+        return "Class";
+    case TokenType::In:
+        return "In";
     case TokenType::Array:
         return "Array";
+    case TokenType::Count:
+        return "Count";
     }
+
     return "Unknown";
 }
