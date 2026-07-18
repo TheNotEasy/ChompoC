@@ -2,7 +2,6 @@
 #include "environment.h"
 #include "interpreter.h"
 #include "parser/ast.h"
-#include "return_signal.h"
 
 #include <limits>
 #include <utility>
@@ -15,10 +14,8 @@ bool NativeFunction::accepts_arity(std::size_t count) const { return count >= mi
 std::string NativeFunction::arity_description() const {
     if (min_arity_ == max_arity_)
         return std::to_string(min_arity_);
-
     if (max_arity_ == std::numeric_limits<std::size_t>::max())
         return "at least " + std::to_string(min_arity_);
-
     return std::to_string(min_arity_) + ".." + std::to_string(max_arity_);
 }
 
@@ -48,24 +45,16 @@ Value UserFunction::call(Interpreter &interpreter, const Token &, const std::vec
     for (std::size_t index = 0; index < declaration_->parameters.size(); ++index)
         environment->define(declaration_->parameters[index], arguments[index]);
 
-    Value result(nullptr);
+    Value result = interpreter.execute_function_body(declaration_->body, environment);
 
-    try {
-        interpreter.execute_block(declaration_->body, environment);
-    } catch (const ReturnSignal &signal) {
-        result = signal.value;
-    }
-
-    // A closure created during this call keeps the frame alive. Reuse only
-    // frames that are owned exclusively by this invocation.
-    if (environment.use_count() == 1 && frame_pool_.size() < MaxCachedFrames)
+    if (environment.use_count() == 1 && frame_pool_.size() < MaxCachedFrames) {
+        environment->reset(nullptr, frame_slots);
         frame_pool_.push_back(std::move(environment));
+    }
 
     return result;
 }
 
 std::string UserFunction::name() const { return declaration_->name.lexeme; }
-
 bool UserFunction::accepts_arity(std::size_t count) const { return count == declaration_->parameters.size(); }
-
 std::string UserFunction::arity_description() const { return std::to_string(declaration_->parameters.size()); }

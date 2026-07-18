@@ -52,8 +52,6 @@ std::uint32_t Resolver::declare(Token &name) {
 
     std::uint32_t slot = 0;
     if (existing != scope.slots.end()) {
-        // Keep runtime duplicate-declaration behaviour: both declarations
-        // address the same slot and Environment::define reports the error.
         slot = existing->second;
     } else {
         if (scope.next_slot == std::numeric_limits<std::uint32_t>::max())
@@ -95,11 +93,8 @@ void Resolver::resolve_node(EmptyStmt &) {}
 void Resolver::resolve_node(ExpressionStmt &statement) { resolve(*statement.expression); }
 
 void Resolver::resolve_node(VarStmt &statement) {
-    // Preserve the old shadowing rule: the initializer is evaluated before
-    // the new name exists, so `var x = x;` may read an outer x.
     if (statement.initializer)
         resolve(*statement.initializer);
-
     declare(statement.name);
 }
 
@@ -112,7 +107,7 @@ void Resolver::resolve_node(BlockStmt &statement) {
     begin_scope();
     for (StmtPtr &child : statement.statements)
         resolve(*child);
-    end_scope();
+    statement.scope_slots = end_scope();
 }
 
 void Resolver::resolve_node(IfStmt &statement) {
@@ -131,7 +126,6 @@ void Resolver::resolve_node(BreakStmt &) {}
 void Resolver::resolve_node(ContinueStmt &) {}
 
 void Resolver::resolve_node(FunctionStmt &statement) {
-    // Declare first so local recursion resolves to the enclosing slot.
     declare(statement.name);
 
     begin_scope();
@@ -157,9 +151,7 @@ void Resolver::resolve_node(ForInStmt &statement) {
 }
 
 void Resolver::resolve_node(LiteralExpr &) {}
-
 void Resolver::resolve_node(VariableExpr &expression) { resolve_reference(expression.name); }
-
 void Resolver::resolve_node(UnaryExpr &expression) { resolve(*expression.right); }
 
 void Resolver::resolve_node(BinaryExpr &expression) {
