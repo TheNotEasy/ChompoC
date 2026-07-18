@@ -13,6 +13,16 @@ namespace {
         throw std::runtime_error("Resolver error: in " + std::to_string(token.position.line) + ":" +
                                  std::to_string(token.position.column) + " near '" + token.lexeme + "':\n" + message);
     }
+
+    bool block_declares_bindings(const BlockStmt &statement) {
+        for (const StmtPtr &child : statement.statements) {
+            if (std::holds_alternative<VarStmt>(child->node) ||
+                std::holds_alternative<FunctionStmt>(child->node)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
 void Resolver::resolve(Program &program) {
@@ -89,7 +99,6 @@ void Resolver::resolve_reference(Token &name) {
 }
 
 void Resolver::resolve_node(EmptyStmt &) {}
-
 void Resolver::resolve_node(ExpressionStmt &statement) { resolve(*statement.expression); }
 
 void Resolver::resolve_node(VarStmt &statement) {
@@ -104,6 +113,13 @@ void Resolver::resolve_node(PrintStmt &statement) {
 }
 
 void Resolver::resolve_node(BlockStmt &statement) {
+    if (!block_declares_bindings(statement)) {
+        statement.scope_slots = 0;
+        for (StmtPtr &child : statement.statements)
+            resolve(*child);
+        return;
+    }
+
     begin_scope();
     for (StmtPtr &child : statement.statements)
         resolve(*child);

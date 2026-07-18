@@ -36,3 +36,14 @@ print(counter(), " ", counter(), "\n");
 
     print(factorial(6), "\n");
 }
+
+fun skipEmptyScopes(value) {
+    {
+        {
+            value++;
+        }
+    }
+    return value;
+}
+
+print(skipEmptyScopes(40), "\n");
