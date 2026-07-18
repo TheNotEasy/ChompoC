@@ -28,7 +28,7 @@
 | Коллекции | индексация, мутация, `len`, `in`, `push`, `pop`, конкатенация, повторение |
 | I/O | `input`, `istream`, `ostream`, `iostream` |
 | TCP | `netListen`, `netConnect`, `netAccept`, `netPoll`, `netSend`, receive API, close |
-| Проверки | CTest, Windows/Linux CI, Release performance/TLE suite |
+| Проверки | CTest, Windows/Linux CI, Release execution-only TLE suite |
 
 ## Сборка
 
@@ -104,14 +104,28 @@ print(pop(values), "\n"); // 30
 
 Семантика closures сохраняется: захваченный frame никогда не возвращается в пул.
 
-## Performance/TLE checker
+## Execution-only TLE checker
+
+CI не включает configure, компиляцию и линковку в TLE:
+
+1. job `performance-build` отдельно собирает Release-бинарник и загружает его как artifact;
+2. job `performance-execution` скачивает уже готовый бинарник;
+3. Python-checker замеряет только время процесса `Chompo <case>.chmp`.
+
+Локальный запуск после уже выполненной Release-сборки:
 
 ```bash
-cmake -S . -B build-perf -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCHOMPO_ENABLE_PERFORMANCE_TESTS=ON
-cmake --build build-perf --parallel
-ctest --test-dir build-perf -L performance --output-on-failure
+python tests/performance/run_performance_suite.py \
+  --executable build-release/Chompo \
+  --cases tests/performance/cases
+```
+
+На Windows:
+
+```powershell
+python tests/performance/run_performance_suite.py `
+  --executable build-release/Chompo.exe `
+  --cases tests/performance/cases
 ```
 
 Checker запускает тяжёлые программы для:
@@ -121,7 +135,7 @@ Checker запускает тяжёлые программы для:
 - массовых `push/pop`;
 - lookup через глубокую цепочку scope.
 
-Для каждого сценария проверяется и время, и checksum. TLE не исправляется простым повышением лимита — сначала оптимизируется runtime.
+Для каждого сценария проверяется время исполнения и checksum. Установка CMake, сборка C++, artifact upload/download и запуск Python не входят в индивидуальный TLE.
 
 ## Документация
 
