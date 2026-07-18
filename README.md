@@ -16,7 +16,7 @@
 </div>
 
 > [!IMPORTANT]
-> Рабочая ветка проекта — `dev`. Эта feature-ветка добавляет `push/pop`, оптимизации, Wiki и performance/TLE checker. Собственная VM для LangJam не требуется.
+> Рабочая ветка проекта — `dev`. Feature-ветка `feature/perf-wiki-push-pop` содержит Wiki, `push/pop`, TLE-checker и оптимизированный runtime. Собственная VM для LangJam не требуется.
 
 ## Возможности
 
@@ -81,58 +81,64 @@ print(pop(values), "\n"); // 30
 ```javascript
 var values = Array{};
 
-var length = push(values, 1, 2, 3); // 3
-var last = pop(values);             // 3
-var empty = pop(Array{});           // NULL
+push(values, 10);
+push(values, 20, 30);
+
+print(values, "\n"); // {10, 20, 30}
+print(pop(values), "\n"); // 30
 ```
 
-- `push(array, values...)` мутирует массив и возвращает новую длину;
-- `pop(array)` удаляет и возвращает последний элемент;
-- массивы имеют ссылочную семантику, поэтому изменение видно через aliases;
-- создание циклических ссылок запрещено и проверяется до изменения массива.
+`push(array, values...)` мутирует массив и возвращает новую длину. `pop(array)` удаляет последний элемент; пустой массив возвращает `NULL`.
+
+## Оптимизированный runtime
+
+Текущая feature-ветка ускоряет hot paths без VM:
+
+- имена интернируются в числовые `SymbolId`;
+- Environment работает по `uint32_t` вместо повторного хеширования строк;
+- глубина lookup кешируется внутри scope;
+- завершённые function frames переиспользуются, если не удерживаются closure;
+- lexer использует `string_view` для keywords и заранее резервирует tokens;
+- Release использует IPO/LTO при поддержке компилятором;
+- исходный файл читается одним выделением памяти.
+
+Семантика closures сохраняется: захваченный frame никогда не возвращается в пул.
 
 ## Performance/TLE checker
 
-Тяжёлые проверки запускаются отдельно на Release-сборке:
-
 ```bash
-cmake -S . -B build-perf \
+cmake -S . -B build-perf -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCHOMPO_ENABLE_PERFORMANCE_TESTS=ON
 cmake --build build-perf --parallel
 ctest --test-dir build-perf -L performance --output-on-failure
 ```
 
-Checker выполняет тяжёлую арифметику, частые вызовы функций, глубокий lookup scope и массовые `push/pop`. Он сверяет контрольные суммы и завершает тест с `TLE`, если сценарий превышает лимит.
+Checker запускает тяжёлые программы для:
 
-## Оптимизации этой ветки
+- арифметики и циклов;
+- пользовательских функций;
+- массовых `push/pop`;
+- lookup через глубокую цепочку scope.
 
-- Release IPO/LTO, когда поддерживается компилятором;
-- предупреждения компилятора `/W4` или `-Wall -Wextra -Wpedantic`;
-- чтение исходного файла одной заранее выделенной строкой;
-- отключение синхронизации C++ streams с C stdio;
-- предварительный `reserve` для global/local environments;
-- `push` вместо квадратичной конкатенации `array += Array{value}`;
-- отдельный Release performance job в GitHub Actions.
+Для каждого сценария проверяется и время, и checksum. TLE не исправляется простым повышением лимита — сначала оптимизируется runtime.
 
 ## Документация
 
-Полная документация находится в [`docs/wiki`](docs/wiki/Home.md) и включает:
+Полная документация находится в [`docs/wiki`](docs/wiki/Home.md):
 
-- весь синтаксис;
-- типы, truthiness и операторы;
-- функции, closures и scope;
+- синтаксис и приоритет операторов;
+- типы и преобразования;
+- функции и closures;
 - массивы и строки;
-- каждую встроенную функцию;
-- файловый I/O;
-- весь Network API;
-- ошибки, ограничения и performance checker.
-
-Файлы имеют формат GitHub Wiki (`Home.md`, `_Sidebar.md`). После включения Wiki их можно перенести в `ChompoC.wiki.git` без изменения структуры.
+- все встроенные функции;
+- I/O и файловые режимы;
+- полный Network API;
+- runtime, ошибки и performance suite.
 
 ## LangJam
 
-Tree-walk интерпретатор на C++ уже удовлетворяет требованию реализации языка. VM и AtomVM не обязательны. До сдачи остаются главным образом сервер и клиент чата на Chompo, broadcast, последние N сообщений, корректное отключение и инструкция запуска.
+Chompo уже является интерпретатором на C++, поэтому отдельная VM не обязательна. Для сдачи остаётся написать многопользовательский чат на самом Chompo, добавить историю последних сообщений и инструкцию запуска.
 
 ## Лицензия
 

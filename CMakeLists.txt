@@ -9,6 +9,7 @@ option(CHOMPO_ENABLE_PERFORMANCE_TESTS "Enable heavy Release performance/TLE che
 
 add_executable(Chompo
         src/main.cpp
+        src/lexer/symbol.h src/lexer/symbol.cpp
         src/lexer/token.h src/lexer/token.cpp src/lexer/lexer.h src/lexer/lexer.cpp
         src/parser/ast.h src/parser/parser.h src/parser/parser.cpp src/parser/ast_printer.h src/parser/ast_printer.cpp
         src/interpreter/value.h src/interpreter/value.cpp

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "symbol.h"
+
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -77,6 +79,7 @@ struct Token {
     TokenType type;
     std::string lexeme;
     SourcePosition position;
+    SymbolId symbol = InvalidSymbol;
 };
 
 std::string_view token_type_name(TokenType type);
