@@ -96,11 +96,6 @@ jobs:
       - name: Checkout benchmark sources
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
       - name: Download prebuilt Release binary
         uses: actions/download-artifact@v4
         with:
@@ -110,8 +105,8 @@ jobs:
       - name: Restore executable permission
         run: chmod +x benchmark-bin/Chompo
 
-      - name: Run execution-only TLE checker
+      - name: Run measured execution only
         run: >-
-          python tests/performance/run_performance_suite.py
+          python3 tests/performance/run_performance_suite.py
           --executable benchmark-bin/Chompo
           --cases tests/performance/cases
