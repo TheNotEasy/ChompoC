@@ -26,7 +26,7 @@ add_executable(Chompo
         src/interpreter/environment.h src/interpreter/environment.cpp
         src/interpreter/interpreter.h src/interpreter/interpreter.cpp
         src/interpreter/callable.h src/interpreter/callable.cpp
-        src/interpreter/collection_builtins.cpp
+        src/interpreter/collection_builtins.cpp src/interpreter/system_builtins.cpp
         src/interpreter/io_manager.h src/interpreter/io_manager.cpp src/interpreter/io_builtins.cpp
         src/interpreter/network_manager.h src/interpreter/network_manager.cpp src/interpreter/network_builtins.cpp
         src/interpreter/return_signal.h src/interpreter/loop_signal.h src/config.h
@@ -125,6 +125,8 @@ add_chompo_test(collections 0 FALSE)
 add_chompo_test(push_cycle 1 TRUE)
 add_chompo_test(push_invalid_target 1 TRUE)
 add_chompo_test(pop_invalid_target 1 TRUE)
+add_chompo_test(remove_at_invalid_target 1 TRUE)
+add_chompo_test(remove_at_invalid_index 1 TRUE)
 add_chompo_test(resolver_slots 0 FALSE)
 add_chompo_test(control_flow_fast 0 FALSE)
 
@@ -141,6 +143,13 @@ add_test(NAME io_streams
         -DTEST_TEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/Testing/Temporary/chompo-io-tests
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_io_suite.cmake)
 set_tests_properties(io_streams PROPERTIES TIMEOUT 10)
+
+add_test(NAME system_args
+        COMMAND ${CMAKE_COMMAND}
+        -DCHOMPO_EXECUTABLE=$<TARGET_FILE:Chompo>
+        -DTEST_TEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/Testing/Temporary/chompo-args-tests
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_args_suite.cmake)
+set_tests_properties(system_args PROPERTIES TIMEOUT 5)
 
 add_executable(network_manager_test
         tests/network_manager_test.cpp

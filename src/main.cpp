@@ -15,6 +15,8 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <utility>
+#include <vector>
 
 std::filesystem::path find_file(const std::filesystem::path &relative_path) {
     std::filesystem::path directory = std::filesystem::current_path();
@@ -89,12 +91,18 @@ int main(int argc, char *argv[]) {
             std::cout << "====== Output ======\n";
         }
 
+        std::vector<std::string> script_arguments;
+        script_arguments.reserve(argc > 2 ? static_cast<std::size_t>(argc - 2) : 0);
+        for (int index = 2; index < argc; ++index)
+            script_arguments.emplace_back(argv[index]);
+
         IOManager io_manager(std::cin, std::cout);
         NetworkManager network_manager;
         Interpreter interpreter(io_manager.output_stream());
         interpreter.install_collection_builtins();
         interpreter.install_io_builtins(io_manager);
         interpreter.install_network_builtins(network_manager);
+        interpreter.install_system_builtins(std::move(script_arguments));
         interpreter.interpret(program);
     } catch (const std::exception &exception) {
         std::cerr << exception.what() << '\n';

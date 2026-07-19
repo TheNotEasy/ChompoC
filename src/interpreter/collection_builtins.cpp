@@ -50,6 +50,20 @@ namespace {
         return array;
     }
 
+    std::size_t require_index(const Token &token, const Value &value, std::size_t size,
+                              const std::string &function_name) {
+        if (!value.is_integer_number())
+            throw RuntimeError(token, function_name + " index must be integer, got " + value.type_name());
+
+        const std::int64_t index = value.number_as_integer();
+        if (index < 0 || static_cast<std::uint64_t>(index) >= static_cast<std::uint64_t>(size)) {
+            throw RuntimeError(token, function_name + " index " + std::to_string(index) +
+                                          " is out of range for array of size " + std::to_string(size));
+        }
+
+        return static_cast<std::size_t>(index);
+    }
+
     Value array_size_value(const Token &token, std::size_t size) {
         if (size > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max()))
             throw RuntimeError(token, "array size is too large to represent as integer");
@@ -75,9 +89,6 @@ void Interpreter::install_collection_builtins() {
                         throw RuntimeError(token, "cyclic array references are not allowed");
                 }
 
-                // Do not reserve exactly size + added_count here. Repeating that
-                // for single-element pushes defeats std::vector's geometric growth
-                // and turns an otherwise amortized O(1) operation into O(n^2).
                 array->insert(array->end(), arguments.begin() + 1, arguments.end());
                 return array_size_value(token, array->size());
             })));
@@ -94,5 +105,18 @@ void Interpreter::install_collection_builtins() {
                 Value value = std::move(array->back());
                 array->pop_back();
                 return value;
+            })));
+
+    globals_->define(
+        "removeAt",
+        Value(std::make_shared<NativeFunction>(
+            "removeAt", 2, 2,
+            [](Interpreter &, const Token &token, const std::vector<Value> &arguments) {
+                ArrayPtr array = require_array(token, arguments[0], "removeAt");
+                const std::size_t index = require_index(token, arguments[1], array->size(), "removeAt");
+
+                Value removed = std::move((*array)[index]);
+                array->erase(array->begin() + static_cast<std::ptrdiff_t>(index));
+                return removed;
             })));
 }
