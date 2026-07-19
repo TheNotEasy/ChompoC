@@ -46,8 +46,10 @@ var tickMs = 0;
 var roomList = Array{"lobby"};
 var histories = Array{Array{}};
 
-// Moderation (array-backed; no Map type required).
+// Moderation: Map for O(1) membership; arrays keep stable list order for display.
+var banned = Map{};
 var bannedNames = Array{};
+var whitelist = Map{};
 var whitelistNames = Array{};
 var whitelistOn = false;
 
@@ -103,6 +105,17 @@ fun listRemoveItem(list, value) {
         return false;
     removeAt(list, index);
     return true;
+}
+
+fun twoDigits(n) {
+    if (n < 10)
+        return "0" + String(n);
+    return String(n);
+}
+
+fun formatTime() {
+    var parts = clockTime();
+    return twoDigits(parts[0]) + ":" + twoDigits(parts[1]) + ":" + twoDigits(parts[2]);
 }
 
 fun splitCmd(line) {
@@ -406,11 +419,11 @@ fun registerName(handle, candidate) {
         nameError(handle, "must match [A-Za-z0-9_.-]{1,24}");
         return true;
     }
-    if (listContains(bannedNames, candidate)) {
+    if (candidate in banned) {
         nameError(handle, "is banned");
         return true;
     }
-    if (whitelistOn && !listContains(whitelistNames, candidate)) {
+    if (whitelistOn && !(candidate in whitelist)) {
         nameError(handle, "is not on the whitelist");
         return true;
     }
@@ -482,11 +495,11 @@ fun renameClient(handle, candidate) {
         nameError(handle, "must match [A-Za-z0-9_.-]{1,24}");
         return true;
     }
-    if (listContains(bannedNames, candidate)) {
+    if (candidate in banned) {
         nameError(handle, "is banned");
         return true;
     }
-    if (whitelistOn && !listContains(whitelistNames, candidate)) {
+    if (whitelistOn && !(candidate in whitelist)) {
         nameError(handle, "is not on the whitelist");
         return true;
     }
@@ -604,8 +617,10 @@ fun cmdBan(handle, index, targetName) {
     if (!isSafeIdent(targetName, 24))
         return sendChatLine(handle, "ERROR invalid name");
 
-    if (!listContains(bannedNames, targetName))
+    if (!(targetName in banned)) {
+        banned[targetName] = true;
         push(bannedNames, targetName);
+    }
 
     var target = findName(targetName);
     if (target >= 0) {
@@ -626,9 +641,10 @@ fun cmdUnban(handle, index, targetName) {
         return true;
     if (len(targetName) == 0)
         return sendChatLine(handle, "ERROR usage: /unban <name>");
-    if (!listContains(bannedNames, targetName))
+    if (!(targetName in banned))
         return sendChatLine(handle, "ERROR name is not banned");
 
+    removeKey(banned, targetName);
     listRemoveItem(bannedNames, targetName);
     if (!sendChatLine(handle, "OK unbanned " + targetName))
         return false;
@@ -695,15 +711,19 @@ fun cmdWhitelist(handle, index, rest) {
         var name = splitCmd(arg)[0];
         if (!isSafeIdent(name, 24))
             return sendChatLine(handle, "ERROR usage: /whitelist add <name>");
-        if (!listContains(whitelistNames, name))
+        if (!(name in whitelist)) {
+            whitelist[name] = true;
             push(whitelistNames, name);
+        }
         return sendChatLine(handle, "OK whitelist add " + name);
     }
 
     if (action == "remove") {
         var removeName = splitCmd(arg)[0];
-        if (!listRemoveItem(whitelistNames, removeName))
+        if (!(removeName in whitelist))
             return sendChatLine(handle, "ERROR name not on whitelist");
+        removeKey(whitelist, removeName);
+        listRemoveItem(whitelistNames, removeName);
         return sendChatLine(handle, "OK whitelist remove " + removeName);
     }
 
@@ -832,7 +852,7 @@ fun processLine(handle, line) {
     if (len(clean) == 0)
         return true;
 
-    var message = names[index] + ": " + clean;
+    var message = "[" + formatTime() + "] " + names[index] + ": " + clean;
     appendHistory(rooms[index], message);
     termPrint(message, "message");
     broadcastRoom(rooms[index], message);

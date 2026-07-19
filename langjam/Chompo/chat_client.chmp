@@ -164,24 +164,33 @@ fun packetStyle(text) {
 }
 
 fun parseChatSender(line) {
-    // "Name: body" — used for local mute filtering.
-    var colon = findChar(line, ":"[0], 0);
-    if (colon < 1)
-        return NULL;
-    if (colon + 1 >= len(line) || line[colon + 1] != " "[0])
-        return NULL;
+    // Supports "Name: body" and "[HH:MM:SS] Name: body" for local mute filtering.
     if (startsWith(line, "ERROR") || startsWith(line, "OK ") || startsWith(line, "HISTORY ") ||
         startsWith(line, "USERS ") || startsWith(line, "USER ") || startsWith(line, "STATUS ") ||
         startsWith(line, "ROOM ") || startsWith(line, "ROOMS ") || startsWith(line, "ROLE ") ||
         startsWith(line, "COMMANDS") || startsWith(line, "[DM ") || startsWith(line, "KICKED") ||
         startsWith(line, "NAME ") || startsWith(line, "BANS ") || startsWith(line, "WHITELIST ") ||
-        startsWith(line, "* "))
+        startsWith(line, "* ") || startsWith(line, "[SERVER]"))
+        return NULL;
+
+    var rest = line;
+    if (len(line) > 0 && line[0] == "["[0]) {
+        var close = findChar(line, "]"[0], 0);
+        if (close < 0 || close + 2 >= len(line) || line[close + 1] != " "[0])
+            return NULL;
+        rest = sliceFrom(line, close + 2);
+    }
+
+    var colon = findChar(rest, ":"[0], 0);
+    if (colon < 1)
+        return NULL;
+    if (colon + 1 >= len(rest) || rest[colon + 1] != " "[0])
         return NULL;
 
     var name = "";
     var i = 0;
     while (i < colon) {
-        name = name + line[i];
+        name = name + rest[i];
         i++;
     }
     return name;
