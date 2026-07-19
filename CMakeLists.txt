@@ -9,36 +9,10 @@ option(CHOMPO_ENABLE_PERFORMANCE_TESTS "Enable heavy Release performance/TLE che
 option(CHOMPO_NATIVE_OPTIMIZATIONS "Optimize Release binaries for the current CPU" OFF)
 option(CHOMPO_PGO_GENERATE "Build an instrumented binary for profile generation" OFF)
 option(CHOMPO_PGO_USE "Build using previously generated profile data" OFF)
-option(CHOMPO_BUNDLE_MINGW_RUNTIME "Copy MinGW runtime DLLs next to Windows executables" ON)
 
 if(CHOMPO_PGO_GENERATE AND CHOMPO_PGO_USE)
     message(FATAL_ERROR "CHOMPO_PGO_GENERATE and CHOMPO_PGO_USE are mutually exclusive")
 endif()
-
-function(chompo_bundle_mingw_runtime target)
-    if(NOT MINGW OR NOT CHOMPO_BUNDLE_MINGW_RUNTIME)
-        return()
-    endif()
-
-    get_filename_component(CHOMPO_MINGW_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
-    file(GLOB CHOMPO_MINGW_RUNTIME_DLLS CONFIGURE_DEPENDS
-            "${CHOMPO_MINGW_BIN_DIR}/libstdc++-6.dll"
-            "${CHOMPO_MINGW_BIN_DIR}/libgcc_s_*.dll"
-            "${CHOMPO_MINGW_BIN_DIR}/libwinpthread-1.dll")
-
-    if(NOT CHOMPO_MINGW_RUNTIME_DLLS)
-        message(WARNING "MinGW runtime DLLs were not found next to ${CMAKE_CXX_COMPILER}")
-        return()
-    endif()
-
-    foreach(runtime_dll IN LISTS CHOMPO_MINGW_RUNTIME_DLLS)
-        add_custom_command(TARGET ${target} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${runtime_dll}"
-                        "$<TARGET_FILE_DIR:${target}>"
-                VERBATIM)
-    endforeach()
-endfunction()
 
 add_executable(Chompo
         src/main.cpp
@@ -108,8 +82,6 @@ endif()
 if(WIN32)
     target_link_libraries(Chompo PRIVATE ws2_32)
 endif()
-
-chompo_bundle_mingw_runtime(Chompo)
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT CHOMPO_IPO_SUPPORTED OUTPUT CHOMPO_IPO_ERROR)
@@ -205,7 +177,6 @@ endif()
 if(WIN32)
     target_link_libraries(network_manager_test PRIVATE ws2_32)
 endif()
-chompo_bundle_mingw_runtime(network_manager_test)
 add_test(NAME network_manager COMMAND network_manager_test)
 set_tests_properties(network_manager PROPERTIES TIMEOUT 10)
 
