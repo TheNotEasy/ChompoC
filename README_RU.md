@@ -2,42 +2,44 @@
 
 # Chompo
 
-### Динамический язык и tree-walk интерпретатор на C++23
+### Динамический язык, оптимизированный интерпретатор и многопользовательский TCP-чат на C++23
 
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus&logoColor=white)](https://en.cppreference.com/w/cpp/23)
-[![CMake](https://img.shields.io/badge/CMake-4.2%2B-064F8C?logo=cmake&logoColor=white)](https://cmake.org/)
-[![CI](https://github.com/Bony-Lord/ChompoC/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/Bony-Lord/ChompoC/actions/workflows/ci.yml)
+[![CMake](https://img.shields.io/badge/CMake-4.2%2B-064F8C?logo=cmake)](https://cmake.org/)
+[![CI](https://github.com/Bony-Lord/ChompoC/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Bony-Lord/ChompoC/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
-![Runtime](https://img.shields.io/badge/runtime-tree--walk-7c3aed)
-![LangJam](https://img.shields.io/badge/LangJam-chat_in_progress-f59e0b)
+![Runtime](https://img.shields.io/badge/runtime-optimized_tree--walk-7c3aed)
+![LangJam](https://img.shields.io/badge/LangJam-chat_ready-2ea44f)
 
-**Chompo** — динамически типизированный язык с файлами `.chmp`, функциями первого класса, замыканиями, изменяемыми массивами и строками, файловым I/O и TCP API.
+**Chompo** — динамически типизированный язык с функциями первого класса, замыканиями, изменяемыми массивами и байтовыми строками, файловым I/O, аргументами командной строки и неблокирующим TCP API.
 
-[Возможности](#-возможности) · [Запуск](#-быстрый-старт) · [I/O](#-ввод-и-вывод) · [Network API](#-network-api) · [LangJam](#-готовность-к-langjam) · [Roadmap](#-roadmap)
+[GitHub Wiki](https://github.com/Bony-Lord/ChompoC/wiki) · [Синтаксис](docs/wiki/Language-Syntax.md) · [Built-ins](docs/wiki/Built-in-Functions.md) · [Network API](docs/wiki/Network-API.md) · [LangJam Chat](docs/wiki/LangJam-Chat.md)
 
 </div>
 
+**English version → [README.md](README.md)**
+
 > [!IMPORTANT]
-> Рабочая ветка проекта — `dev`. До сдачи LangJam приоритет имеют работающий чат, документация запуска и демонстрационный сценарий. Собственная VM и AtomVM не требуются.
+> Основная ветка проекта — `main`. Страницы GitHub Wiki автоматически синхронизируются из `docs/wiki` только для `origin/main`.
 
-## ✨ Возможности
+## Возможности
 
-| Подсистема | Статус | Возможности |
-|---|:---:|---|
-| Значения | ✅ | `NULL`, `bool`, `integer`, `double`, `char`, `string`, `array`, `callable` |
-| Переменные | ✅ | `var`, вложенные scope, обычные и составные присваивания |
-| Управление | ✅ | `if`, `else`, `while`, `for-in`, `break`, `continue` |
-| Функции | ✅ | параметры, `return`, рекурсия, first-class functions, closures |
-| Коллекции | ✅ | массивы, индексация, мутация, `len`, `in`, повторение и конкатенация |
-| Строки | ✅ | байтовые `char`, индексация и мутация |
-| I/O | ✅ | `input`, `istream`, `ostream`, `iostream` |
-| TCP | ✅ | listener, client socket, poll, accept, send, receive, close |
-| Надёжность | ✅ | Runtime StackOverflow, запрет циклических массивов, CTest, GitHub Actions |
-| LangJam chat | 🚧 | сервер и клиент на Chompo ещё нужно написать |
+| Подсистема | Возможности |
+|---|---|
+| Значения | `NULL`, `bool`, `integer`, `double`, `char`, `string`, `array`, `callable` |
+| Управление | `if`, `else`, `while`, `for-in`, `break`, `continue`, `return` |
+| Функции | рекурсия, closures, функции как значения |
+| Коллекции | индексация, мутация, `len`, `in`, `push`, `pop`, `removeAt`, конкатенация, повторение |
+| I/O | `input`, `inputPoll`, `flush`, `istream`, `ostream`, `iostream` |
+| Система | `args()` для аргументов Chompo-программы |
+| TCP | listener/client sockets, `netPoll`, partial send, `netSendAll`, receive statuses, close |
+| Runtime | Resolver, `SymbolId`, плотные local slots, environment pools, cached literals, integer fast paths |
+| Чат | уникальные имена, broadcast, ограниченная история, `/help`, `/history`, `/quit`, очистка отключений |
+| Проверки | Windows/Linux CTest, TCP loopback, end-to-end chat test, execution-only Release TLE suite |
 
-## 🚀 Быстрый старт
+## Сборка
 
-Требуется компилятор с C++23 и CMake 4.2+.
+Требуются компилятор с поддержкой C++23 и CMake 4.2+.
 
 ```bash
 cmake -S . -B build
@@ -45,222 +47,174 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-Запуск:
+Release-сборка:
 
 ```bash
-./build/Chompo program.chmp
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --parallel
 ```
+
+Запуск Chompo-программы:
+
+```bash
+./build/Chompo program.chmp argument1 argument2
+```
+
+`args()` возвращает только аргументы, записанные после имени `.chmp`-файла.
 
 Windows с multi-config генератором:
 
 ```powershell
-.\build\Debug\Chompo.exe program.chmp
+.\build\Debug\Chompo.exe program.chmp argument1 argument2
 ```
 
-## ⚡ Пример
+## Пример языка
 
 ```javascript
-fun sum(values) {
-    var result = 0;
+fun makeCounter(start) {
+    var value = start;
 
-    for (var value in values)
-        result += value;
-
-    return result;
-}
-
-var values = Array{10, 20, 30};
-print(sum(values), "\n");
-```
-
-## 🧩 Основной синтаксис
-
-```javascript
-var value = 10;
-value += 5;
-
-if (value > 10) {
-    print("large\n");
-}
-
-while (value > 0)
-    value--;
-
-for (var character in "Chompo") {
-    if (character == 'm')
-        continue;
-
-    print(character);
-}
-```
-
-Встроенные преобразования: `Int`, `Double`, `Bool`, `String`, `Char`, `Array`, `CATS`, `Type`.
-
-## 📥 Ввод и вывод
-
-`input()` читает одну строку из текущего входного потока без `\n`. На EOF возвращается `NULL`.
-
-```javascript
-var line = input();
-```
-
-Стандартный поток обозначается строкой `"standart"` — написание сохранено как часть текущего API.
-
-```javascript
-istream("input.txt");
-istream("standart");
-
-ostream("output.txt", "rewrite");
-ostream("output.txt", "append");
-ostream("new.txt", "create");
-ostream("standart");
-
-iostream("input.txt", "output.txt", "rewrite");
-iostream();
-```
-
-Режимы выходного файла:
-
-| Режим | Поведение |
-|---|---|
-| `"rewrite"` | создать файл или полностью перезаписать существующий; значение по умолчанию |
-| `"append"` | дописывать в конец |
-| `"create"` | создать новый файл и завершиться ошибкой, если он уже существует |
-
-## 🌐 Network API
-
-Сетевой API использует TCP-сокеты хоста. Собственная VM для него не нужна.
-
-| Функция | Результат |
-|---|---|
-| `netListen(host, port, backlog?)` | handle listener-а |
-| `netConnect(host, port)` | handle client socket-а |
-| `netAccept(listener)` | socket handle или `NULL`, если подключений пока нет |
-| `netPoll(handles, timeoutMs?)` | массив готовых handles |
-| `netSend(socket, data)` | количество отправленных байт |
-| `netReceive(socket, maxBytes?)` | `Array{"data", text}`, `Array{"wait"}` или `Array{"closed"}` |
-| `netReceiveLine(socket)` | такая же структура, но чтение до `\n` |
-| `netPort(handle)` | локальный TCP-порт; удобно для тестов с портом `0` |
-| `netClose(handle)` | закрывает listener или socket |
-
-Минимальный echo-сервер:
-
-```javascript
-var listener = netListen("0.0.0.0", 4040);
-var clients = Array{};
-
-while (true) {
-    var watched = Array{listener} + clients;
-    var ready = netPoll(watched, 100);
-
-    for (var handle in ready) {
-        if (handle == listener) {
-            var client = netAccept(listener);
-            if (client != NULL)
-                clients += Array{client};
-            continue;
-        }
-
-        var packet = netReceiveLine(handle);
-
-        if (packet[0] == "data")
-            netSend(handle, packet[1] + "\n");
+    fun next() {
+        value++;
+        return value;
     }
+
+    return next;
 }
+
+var counter = makeCounter(10);
+var values = Array{counter(), counter()};
+push(values, 13);
+print(values, "\n"); // {11, 12, 13}
 ```
 
-> [!NOTE]
-> API синхронный, но сокеты неблокирующие. `netPoll` позволяет построить однопоточный event loop и обслуживать нескольких пользователей одним интерпретатором.
+## LangJam Chat
 
-## 🏗 Архитектура
+Запуск сервера:
 
-```mermaid
-flowchart LR
-    A[.chmp source] --> B[Lexer]
-    B --> C[Pratt Parser]
-    C --> D[AST]
-    D --> E[Tree-walk Interpreter]
-    E --> F[Environment / Closures]
-    E --> G[Value Runtime]
-    E --> H[Native APIs]
-    H --> I[File I/O]
-    H --> J[TCP NetworkManager]
-    J --> K[poll-based event loop]
+```bash
+./build/Chompo langjam/Chompo/chat_server.chmp 0.0.0.0 4040 50
 ```
 
-Tree-walk интерпретатор уже удовлетворяет требованию «компилятор или интерпретатор». Bytecode VM может быть полезна позже для скорости, но не является частью обязательной сдачи.
+Необязательные аргументы: `host`, `port`, `historyLimit`. Порт `0` просит операционную систему выбрать свободный порт, после чего сервер выводит `LISTENING <port>`.
 
-## 🧪 Тестирование
+Запуск одного или нескольких клиентов:
+
+```bash
+./build/Chompo langjam/Chompo/chat_client.chmp 127.0.0.1 4040
+```
+
+Windows:
+
+```powershell
+.\build\Debug\Chompo.exe langjam\Chompo\chat_server.chmp 0.0.0.0 4040 50
+.\build\Debug\Chompo.exe langjam\Chompo\chat_client.chmp 127.0.0.1 4040
+```
+
+Команды клиента:
+
+```text
+/help       показать доступные команды
+/history    получить текущую ограниченную историю
+/quit       выйти из чата
+```
+
+Сервер и клиент полностью написаны на Chompo. C++ предоставляет интерпретатор и host API для TCP и потоков.
+
+## Chat-ready API
+
+```javascript
+var arguments = args();
+var clients = Array{};
+push(clients, socket);
+removeAt(clients, 0);
+
+var console = inputPoll(0);
+// {"data", line}, {"wait"}, {"closed"}
+
+flush();
+
+var sent = netSendAll(socket, "hello\n", 2000);
+// {"sent", bytes}, {"timeout", bytes}, {"error", bytes, message}
+```
+
+`netSend` — низкоуровневая неблокирующая операция, которая может отправить только часть строки. Для сообщений протокола следует использовать `netSendAll`.
+
+`netReceiveLine` возвращает один из вариантов:
+
+```javascript
+Array{"data", line}
+Array{"wait"}
+Array{"closed"}
+Array{"error", message}
+```
+
+Полное описание: [Network API](docs/wiki/Network-API.md).
+
+## Архитектура runtime
+
+```text
+source -> Lexer -> Pratt Parser -> Resolver -> optimized Interpreter
+```
+
+Resolver один раз переводит локальные имена в адреса `(depth, slot)`. Во время исполнения локальные переменные читаются из плотных slots без повторного хеширования строк.
+
+Дополнительные оптимизации hot path:
+
+- декодированные литералы кешируются в AST;
+- блоки без локальных объявлений не создают окружение;
+- block, loop и function environments переиспользуются;
+- `return`, `break` и `continue` не используют C++ exceptions;
+- прямые assignment и update targets;
+- специализированные пути целочисленной арифметики;
+- повторное использование argument vectors;
+- амортизированное O(1) для `push`;
+- Release `-O3`/`/O2`, IPO/LTO и опциональные native/PGO режимы.
+
+Глобальные значения и native-функции остаются в расширяемом реестре `SymbolId`, поэтому новые модули добавляются без изменения runtime локальных slots.
+
+Подробнее: [Runtime Architecture](docs/wiki/Runtime-Architecture.md).
+
+## Тестирование
 
 ```bash
 ctest --test-dir build --output-on-failure
 ```
 
-Набор включает golden tests языка, error regression suite, файловый I/O и TCP loopback-тест. GitHub Actions запускает сборку и тесты на Windows и Ubuntu при `push` и `pull_request`.
+Набор включает языковые и error regression tests, файловый и консольный I/O, TCP loopback tests и `langjam_chat`. End-to-end тест поднимает настоящий сервер Chompo, подключает нескольких клиентов, проверяет отказ занятого имени, broadcast, историю, команды, обычный выход, очистку после TCP reset и запуск настоящего Chompo-клиента.
 
-## 🏁 Готовность к LangJam
+GitHub Actions проверяет Windows, Ubuntu, Release-сборку и execution-only TLE suite.
 
-По правилам `langdev-jam/plic` требуется язык и многопользовательская чат-комната. AtomVM указана как приоритет, но альтернативные платформы разрешены; Chompo уже является интерпретатором на C++.
+## Статус LangJam
 
-### Уже выполнено
+Готово:
 
-- [x] собственный синтаксис и семантика;
-- [x] интерпретатор на выбранной платформе;
-- [x] переменные и динамические типы;
-- [x] условия;
-- [x] циклы и рекурсия;
-- [x] функции и closures;
-- [x] массивы и строки;
-- [x] пользовательский и файловый I/O;
-- [x] TCP listener/client API;
-- [x] неблокирующий `netPoll` для нескольких клиентов;
-- [x] автоматические тесты Windows/Linux.
+- язык и интерпретатор на C++23;
+- необходимые значения, условия, циклы, функции, рекурсия и коллекции;
+- файловый, консольный и TCP API;
+- многопользовательский сервер и клиент на Chompo;
+- уникальные имена и повторная попытка после отказа;
+- broadcast сообщений;
+- ограниченная история последних N сообщений;
+- `/help`, `/history`, `/quit`;
+- очистка после обычных и резких отключений;
+- инструкции запуска и описание языка;
+- автоматическая end-to-end проверка.
 
-### Обязательно осталось
+Submission package находится в [`langjam/Chompo`](langjam/Chompo).
 
-- [ ] написать сервер чата на Chompo;
-- [ ] написать клиент чата на Chompo;
-- [ ] добавление пользователя и уникального имени;
-- [ ] broadcast сообщений всем участникам;
-- [ ] история последних `N` сообщений;
-- [ ] корректный выход и удаление пользователя;
-- [ ] короткая инструкция запуска сервера и клиентов;
-- [ ] краткое описание синтаксиса в директории сдачи;
-- [ ] добавить проект в fork `langdev-jam/plic` и открыть pull request.
+## Roadmap
 
-### На баллы архитектуры и креативности
+Возможные дополнения после jam:
 
-- [ ] команды `/help`, `/history`, `/quit`;
-- [ ] timestamps;
-- [ ] несколько комнат или приватные сообщения;
-- [ ] сохранение истории через `ostream(..., "append")`;
-- [ ] аккуратная обработка отключившихся клиентов.
+- Map/словари;
+- модули и `import`;
+- exceptions уровня языка;
+- Unicode-текст;
+- garbage collector с поддержкой циклов;
+- опциональный bytecode backend;
+- REPL, formatter, LSP и интеграции с редакторами.
 
-> [!WARNING]
-> Дедлайн в репозитории jam указан как **20 июля**. До него не стоит тратить время на VM, GC, LSP или полноценную async-модель.
-
-## 🗺 Roadmap
-
-### До LangJam
-
-- [x] `while`, `for-in`, `break`, `continue`, `in`;
-- [x] потоковый и файловый I/O;
-- [x] строковые режимы `rewrite`, `append`, `create`;
-- [x] TCP API и `netPoll`;
-- [ ] законченный чат на Chompo;
-- [ ] submission package и demo.
-
-### После LangJam
-
-- [ ] `Map`/словари;
-- [ ] модули и `import`;
-- [ ] exceptions языка;
-- [ ] Unicode;
-- [ ] garbage collector для циклических графов;
-- [ ] bytecode compiler и VM только при реальной необходимости производительности;
-- [ ] actors/channels и полноценный async runtime;
-- [ ] REPL, formatter, LSP и редакторские плагины.
-
-## 📄 Лицензия
+## Лицензия
 
 MIT — см. [LICENSE](LICENSE).
