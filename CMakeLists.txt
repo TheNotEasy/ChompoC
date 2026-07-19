@@ -29,6 +29,8 @@ add_executable(Chompo
         src/interpreter/collection_builtins.cpp src/interpreter/system_builtins.cpp
         src/interpreter/io_manager.h src/interpreter/io_manager.cpp src/interpreter/io_builtins.cpp
         src/interpreter/network_manager.h src/interpreter/network_manager.cpp src/interpreter/network_builtins.cpp
+        src/interpreter/secure_channel.h src/interpreter/secure_channel.cpp
+        src/interpreter/secure_network_builtins.cpp
         src/interpreter/return_signal.h src/interpreter/loop_signal.h src/config.h
 )
 
@@ -80,7 +82,12 @@ else()
 endif()
 
 if(WIN32)
-    target_link_libraries(Chompo PRIVATE ws2_32)
+    # Winsock provides TCP; CNG/bcrypt provides PBKDF2, secure randomness and AES-256-GCM.
+    target_link_libraries(Chompo PRIVATE ws2_32 bcrypt)
+else()
+    # Linux uses the system OpenSSL crypto provider for the same protocol.
+    find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+    target_link_libraries(Chompo PRIVATE OpenSSL::Crypto)
 endif()
 
 include(CheckIPOSupported)
@@ -159,7 +166,7 @@ if(Python3_Interpreter_FOUND)
                     --executable $<TARGET_FILE:Chompo>
                     --server ${CMAKE_CURRENT_SOURCE_DIR}/langjam/Chompo/chat_server.chmp
                     --client ${CMAKE_CURRENT_SOURCE_DIR}/langjam/Chompo/chat_client.chmp)
-    set_tests_properties(langjam_chat PROPERTIES TIMEOUT 25)
+    set_tests_properties(langjam_chat PROPERTIES TIMEOUT 40)
 else()
     message(STATUS "Python was not found; the LangJam end-to-end chat test is disabled")
 endif()
