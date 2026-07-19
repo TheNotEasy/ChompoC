@@ -31,6 +31,8 @@ add_executable(Chompo
         src/interpreter/network_manager.h src/interpreter/network_manager.cpp src/interpreter/network_builtins.cpp
         src/interpreter/secure_channel.h src/interpreter/secure_channel.cpp
         src/interpreter/secure_network_builtins.cpp
+        src/interpreter/terminal_manager.h src/interpreter/terminal_manager.cpp
+        src/interpreter/terminal_builtins.cpp
         src/interpreter/return_signal.h src/interpreter/loop_signal.h src/config.h
 )
 
