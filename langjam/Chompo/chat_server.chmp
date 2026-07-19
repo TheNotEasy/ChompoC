@@ -745,7 +745,7 @@ fun handleCommand(handle, index, line) {
     var cmd = parts[0];
     var rest = parts[1];
 
-    if (cmd == "/quit") {
+    if (cmd == "/quit" || cmd == "/exit") {
         sendChatLine(handle, "BYE");
         index = findClient(handle);
         if (index >= 0)
@@ -755,7 +755,7 @@ fun handleCommand(handle, index, line) {
 
     if (cmd == "/help")
         return sendChatLine(handle,
-            "COMMANDS /help /history /users /rooms /room /join /status /nick /me /msg /ping /kick /ban /unban /bans /whitelist /quit");
+            "COMMANDS /help /history /users /rooms /room /join /status /nick /me /msg /ping /kick /ban /unban /bans /whitelist /quit /exit");
 
     if (cmd == "/history") {
         if (!sendHistory(handle, rooms[index])) {

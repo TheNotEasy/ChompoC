@@ -136,7 +136,7 @@ fun showHeader() {
         termPrint("⚠ PLAINTEXT  •  " + serverHost + ":" + String(serverPort), "warning");
     else
         termPrint("🔒 AES-256-GCM  •  " + serverHost + ":" + String(serverPort), "muted");
-    termPrint("/help  /users  /rooms  /join  /status  /mute  /history  /clear  /quit", "muted");
+    termPrint("/help  /users  /rooms  /join  /status  /mute  /history  /clear  /quit  /exit", "muted");
     termPrint("", "default");
 }
 
@@ -493,7 +493,7 @@ fun main() {
                         running = false;
                     }
 
-                    if (line == "/quit") {
+                    if (line == "/quit" || line == "/exit") {
                         waitForGoodbye(socket);
                         running = false;
                     }

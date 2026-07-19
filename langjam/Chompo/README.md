@@ -86,6 +86,7 @@ Terminal 2+ — client (host, port, password optional; if omitted, the client pr
 /mutes                (local)
 /clear
 /quit
+/exit        (alias of /quit)
 ```
 
 ## Server console commands
