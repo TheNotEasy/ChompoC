@@ -1,42 +1,15 @@
-#include "interpreter.h"
 #include "callable.h"
+#include "interpreter.h"
 #include "runtime_error.h"
 
 #include <cstdint>
 #include <limits>
 #include <memory>
 #include <string>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
 namespace {
-    bool contains_array_impl(const Value &value, const ArrayValue *target,
-                             std::unordered_set<const ArrayValue *> &visited) {
-        if (!value.is_array())
-            return false;
-
-        const ArrayPtr &array = std::get<ArrayPtr>(value.data);
-        if (!array)
-            return false;
-        if (array.get() == target)
-            return true;
-        if (!visited.insert(array.get()).second)
-            return false;
-
-        for (const Value &element : *array) {
-            if (contains_array_impl(element, target, visited))
-                return true;
-        }
-
-        return false;
-    }
-
-    bool contains_array(const Value &value, const ArrayValue *target) {
-        std::unordered_set<const ArrayValue *> visited;
-        return contains_array_impl(value, target, visited);
-    }
-
     ArrayPtr require_array(const Token &token, const Value &value, const std::string &function_name) {
         if (!value.is_array()) {
             throw RuntimeError(token, function_name + " requires array as the first argument, got " +
@@ -85,7 +58,7 @@ void Interpreter::install_collection_builtins() {
                     throw RuntimeError(token, "push would make the array too large");
 
                 for (std::size_t index = 1; index < arguments.size(); ++index) {
-                    if (arguments[index].is_array() && contains_array(arguments[index], array.get()))
+                    if (arguments[index].contains_array(array.get()))
                         throw RuntimeError(token, "cyclic array references are not allowed");
                 }
 
@@ -117,6 +90,24 @@ void Interpreter::install_collection_builtins() {
 
                 Value removed = std::move((*array)[index]);
                 array->erase(array->begin() + static_cast<std::ptrdiff_t>(index));
+                return removed;
+            })));
+
+    globals_->define(
+        "removeKey",
+        Value(std::make_shared<NativeFunction>(
+            "removeKey", 2, 2, [](Interpreter &, const Token &token, const std::vector<Value> &arguments) {
+                if (!arguments[0].is_map())
+                    throw RuntimeError(token, "removeKey requires map as the first argument, got " +
+                                                  arguments[0].type_name());
+                const MapPtr &map = std::get<MapPtr>(arguments[0].data);
+                if (!map)
+                    return Value(nullptr);
+                auto it = map->table.find(arguments[1]);
+                if (it == map->table.end())
+                    return Value(nullptr);
+                Value removed = std::move(it->second);
+                map->table.erase(it);
                 return removed;
             })));
 }

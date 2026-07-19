@@ -13,7 +13,6 @@
 #include <string_view>
 #include <system_error>
 #include <type_traits>
-#include <unordered_set>
 #include <utility>
 #include <variant>
 
@@ -133,6 +132,8 @@ namespace {
 
         if (left.is_callable())
             return std::get<CallablePtr>(left.data) == std::get<CallablePtr>(right.data);
+        if (left.is_map())
+            return std::get<MapPtr>(left.data) == std::get<MapPtr>(right.data);
         return false;
     }
 
@@ -158,7 +159,38 @@ namespace {
                                               needle.type_name());
         }
 
-        throw RuntimeError(operation, "right operand of 'in' must be array or string, got " + container.type_name());
+        if (container.is_map()) {
+            const MapPtr &map = std::get<MapPtr>(container.data);
+            if (!map)
+                return Value(false);
+            return Value(map->table.find(needle) != map->table.end());
+        }
+
+        throw RuntimeError(operation,
+                           "right operand of 'in' must be array, string, or map, got " + container.type_name());
+    }
+
+    Value map_lookup(Interpreter &interpreter, const Token &token, const MapPtr &map, const Value &key) {
+        if (!map)
+            throw RuntimeError(token, "operator '[]' cannot be applied to null map");
+
+        auto existing = map->table.find(key);
+        if (existing != map->table.end())
+            return existing->second;
+
+        if (!map->default_factory.is_callable())
+            throw RuntimeError(token, "map key not found");
+
+        const CallablePtr &factory = std::get<CallablePtr>(map->default_factory.data);
+        if (!factory)
+            throw RuntimeError(token, "map default factory is null");
+        if (!factory->accepts_arity(0))
+            throw RuntimeError(token, "map default factory expects " + factory->arity_description() +
+                                          " argument(s), got 0");
+
+        Value created = factory->call(interpreter, token, {});
+        auto inserted = map->table.emplace(key, std::move(created));
+        return inserted.first->second;
     }
 
     Value concatenate_arrays(const ArrayPtr &left, const ArrayPtr &right) {
@@ -460,8 +492,11 @@ namespace {
         } else if (value.is_array()) {
             const ArrayPtr &array = std::get<ArrayPtr>(value.data);
             size = array ? array->size() : 0;
+        } else if (value.is_map()) {
+            const MapPtr &map = std::get<MapPtr>(value.data);
+            size = map ? map->table.size() : 0;
         } else {
-            throw RuntimeError(token, "len requires string or array, got " + value.type_name());
+            throw RuntimeError(token, "len requires string, array, or map, got " + value.type_name());
         }
         if (size > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max()))
             throw RuntimeError(token, "sequence is too large to represent its length");
@@ -476,29 +511,6 @@ namespace {
             throw RuntimeError(token, "index " + std::to_string(index) + " is out of range for sequence of size " +
                                           std::to_string(size));
         return static_cast<std::size_t>(index);
-    }
-
-    bool contains_array_impl(const Value &value, const ArrayValue *target,
-                             std::unordered_set<const ArrayValue *> &visited) {
-        if (!value.is_array())
-            return false;
-        const ArrayPtr &array = std::get<ArrayPtr>(value.data);
-        if (!array)
-            return false;
-        if (array.get() == target)
-            return true;
-        if (!visited.insert(array.get()).second)
-            return false;
-        for (const Value &element : *array) {
-            if (contains_array_impl(element, target, visited))
-                return true;
-        }
-        return false;
-    }
-
-    bool contains_array(const Value &value, const ArrayValue *target) {
-        std::unordered_set<const ArrayValue *> visited;
-        return contains_array_impl(value, target, visited);
     }
 
     void normalize_char_assignment(const Token &operation, const Value &previous, Value &result) {
@@ -545,6 +557,17 @@ Interpreter::Interpreter(std::ostream &output, std::ostream &diagnostics)
                                                                 const std::vector<Value> &arguments) {
         return convert_to_array(token, arguments[0]);
     })));
+    // Map() empty map; Map(factory) defaultdict-style map with zero-arg factory.
+    globals_->define(
+        "Map", Value(make_native("Map", 0, 1, [](Interpreter &, const Token &token, const std::vector<Value> &arguments) {
+            auto map = std::make_shared<MapData>();
+            if (!arguments.empty()) {
+                if (!arguments[0].is_callable())
+                    throw RuntimeError(token, "Map factory must be callable, got " + arguments[0].type_name());
+                map->default_factory = arguments[0];
+            }
+            return Value(std::move(map));
+        })));
     globals_->define("CATS", Value(make_native("CATS", 1, [](Interpreter &, const Token &token,
                                                               const std::vector<Value> &arguments) {
         return convert_char_array_to_string(token, arguments[0]);
@@ -713,6 +736,16 @@ Value Interpreter::evaluate_node(const ArrayExpr &expression) {
     return Value(std::move(array));
 }
 
+Value Interpreter::evaluate_node(const MapExpr &expression) {
+    auto map = std::make_shared<MapData>();
+    for (const auto &entry : expression.elements) {
+        Value key = evaluate(*entry.first);
+        Value value = evaluate(*entry.second);
+        map->table.insert_or_assign(std::move(key), std::move(value));
+    }
+    return Value(std::move(map));
+}
+
 Value Interpreter::evaluate_node(const UnaryExpr &expression) {
     const Value right = evaluate(*expression.right);
     switch (expression.operation.type) {
@@ -787,6 +820,8 @@ Value Interpreter::evaluate_node(const IndexExpr &expression) {
         const std::string &string = std::get<std::string>(object.data);
         return Value(string[checked_index(expression.bracket, index, string.size())]);
     }
+    if (object.is_map())
+        return map_lookup(*this, expression.bracket, std::get<MapPtr>(object.data), index);
     throw RuntimeError(expression.bracket, "operator '[]' cannot be applied to " + object.type_name());
 }
 
@@ -950,7 +985,7 @@ Interpreter::ResolvedTarget Interpreter::resolve_target(const Expr &expression) 
         const std::size_t position = checked_index(index->bracket, index_value, array ? array->size() : 0);
         const Token bracket = index->bracket;
         return ResolvedTarget{(*array)[position], [array, position, bracket](Value value) {
-                                  if (contains_array(value, array.get()))
+                                  if (value.contains_array(array.get()))
                                       throw RuntimeError(bracket, "cyclic array references are not allowed");
                                   (*array)[position] = std::move(value);
                               }};
@@ -970,6 +1005,19 @@ Interpreter::ResolvedTarget Interpreter::resolve_target(const Expr &expression) 
                                                          "string element must be char, got " + value.type_name());
                                   string[position] = std::get<char>(value.data);
                                   write_parent(Value(string));
+                              }};
+    }
+
+    if (object.value.is_map()) {
+        const MapPtr map = std::get<MapPtr>(object.value.data);
+        if (!map)
+            throw RuntimeError(index->bracket, "operator '[]' cannot be applied to null map");
+        Value current(nullptr);
+        auto existing = map->table.find(index_value);
+        if (existing != map->table.end())
+            current = existing->second;
+        return ResolvedTarget{std::move(current), [map, index_value](Value value) {
+                                  map->table.insert_or_assign(index_value, std::move(value));
                               }};
     }
 
