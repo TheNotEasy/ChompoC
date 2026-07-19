@@ -98,29 +98,49 @@ namespace {
         return Value(std::move(array));
     }
 
-    std::size_t send_all(NetworkManager &manager, NetworkManager::Handle socket,
-                         std::string_view data, int timeout_ms) {
+    Value network_error_value(std::string message) {
+        auto array = std::make_shared<ArrayValue>();
+        array->reserve(2);
+        array->emplace_back("error");
+        array->emplace_back(std::move(message));
+        return Value(std::move(array));
+    }
+
+    Value send_result_value(std::string status, std::size_t sent, std::string detail = {}) {
+        auto array = std::make_shared<ArrayValue>();
+        array->reserve(detail.empty() ? 2 : 3);
+        array->emplace_back(std::move(status));
+        array->emplace_back(static_cast<std::int64_t>(sent));
+        if (!detail.empty())
+            array->emplace_back(std::move(detail));
+        return Value(std::move(array));
+    }
+
+    Value send_all(NetworkManager &manager, NetworkManager::Handle socket, std::string_view data, int timeout_ms) {
         const auto started = std::chrono::steady_clock::now();
         std::size_t total = 0;
 
         while (total < data.size()) {
-            const std::size_t sent = manager.send(socket, data.substr(total));
-            total += sent;
+            try {
+                total += manager.send(socket, data.substr(total));
+            } catch (const std::exception &exception) {
+                return send_result_value("error", total, exception.what());
+            }
+
             if (total == data.size())
-                break;
+                return send_result_value("sent", total);
 
             if (timeout_ms >= 0) {
                 const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::steady_clock::now() - started);
                 if (elapsed.count() >= timeout_ms)
-                    throw std::runtime_error("netSendAll timed out after sending " + std::to_string(total) +
-                                             " of " + std::to_string(data.size()) + " bytes");
+                    return send_result_value("timeout", total);
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
-        return total;
+        return send_result_value("sent", total);
     }
 
     template <class Operation> Value perform_network(const Token &token, Operation operation) {
@@ -208,13 +228,7 @@ void Interpreter::install_network_builtins(NetworkManager &network_manager) {
                           timeout_ms = require_int_range(token, arguments[2], "netSendAll timeout", -1,
                                                          std::numeric_limits<int>::max());
                       }
-
-                      return perform_network(token, [manager, socket, data, timeout_ms]() {
-                          const std::size_t sent = send_all(*manager, socket, data, timeout_ms);
-                          if (sent > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max()))
-                              throw std::runtime_error("sent byte count is too large");
-                          return Value(static_cast<std::int64_t>(sent));
-                      });
+                      return send_all(*manager, socket, data, timeout_ms);
                   });
 
     define_native("netReceive", 1, 2,
@@ -235,9 +249,11 @@ void Interpreter::install_network_builtins(NetworkManager &network_manager) {
     define_native("netReceiveLine", 1, 1,
                   [manager](Interpreter &, const Token &token, const std::vector<Value> &arguments) {
                       const NetworkManager::Handle socket = require_handle(token, arguments[0]);
-                      return perform_network(token, [manager, socket]() {
+                      try {
                           return receive_result_to_value(manager->receive_line(socket));
-                      });
+                      } catch (const std::exception &exception) {
+                          return network_error_value(exception.what());
+                      }
                   });
 
     define_native("netPort", 1, 1,
