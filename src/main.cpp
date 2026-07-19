@@ -102,6 +102,7 @@ int main(int argc, char *argv[]) {
         interpreter.install_collection_builtins();
         interpreter.install_io_builtins(io_manager);
         interpreter.install_network_builtins(network_manager);
+        interpreter.install_secure_network_builtins(network_manager);
         interpreter.install_system_builtins(std::move(script_arguments));
         interpreter.interpret(program);
     } catch (const std::exception &exception) {
