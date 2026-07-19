@@ -9,6 +9,7 @@ option(CHOMPO_ENABLE_PERFORMANCE_TESTS "Enable heavy Release performance/TLE che
 option(CHOMPO_NATIVE_OPTIMIZATIONS "Optimize Release binaries for the current CPU" OFF)
 option(CHOMPO_PGO_GENERATE "Build an instrumented binary for profile generation" OFF)
 option(CHOMPO_PGO_USE "Build using previously generated profile data" OFF)
+option(CHOMPO_STATIC_MINGW_RUNTIME "Statically link the MinGW runtime into Windows executables" ON)
 
 if(CHOMPO_PGO_GENERATE AND CHOMPO_PGO_USE)
     message(FATAL_ERROR "CHOMPO_PGO_GENERATE and CHOMPO_PGO_USE are mutually exclusive")
@@ -77,6 +78,12 @@ else()
         target_compile_options(Chompo PRIVATE -fprofile-use -fprofile-correction)
         target_link_options(Chompo PRIVATE -fprofile-use -fprofile-correction)
     endif()
+endif()
+
+if(MINGW AND CHOMPO_STATIC_MINGW_RUNTIME)
+    # Produce a standalone Chompo.exe that does not require MinGW's
+    # libstdc++, libgcc or winpthread DLLs next to the executable.
+    target_link_options(Chompo PRIVATE -static -static-libgcc -static-libstdc++)
 endif()
 
 if(WIN32)
@@ -173,6 +180,9 @@ if(MSVC)
     target_compile_options(network_manager_test PRIVATE /W4)
 else()
     target_compile_options(network_manager_test PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+if(MINGW AND CHOMPO_STATIC_MINGW_RUNTIME)
+    target_link_options(network_manager_test PRIVATE -static -static-libgcc -static-libstdc++)
 endif()
 if(WIN32)
     target_link_libraries(network_manager_test PRIVATE ws2_32)
