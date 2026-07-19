@@ -6,12 +6,21 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(CHOMPO_ENABLE_PERFORMANCE_TESTS "Enable heavy Release performance/TLE checks" OFF)
+option(CHOMPO_NATIVE_OPTIMIZATIONS "Optimize Release binaries for the current CPU" OFF)
+option(CHOMPO_PGO_GENERATE "Build an instrumented binary for profile generation" OFF)
+option(CHOMPO_PGO_USE "Build using previously generated profile data" OFF)
+
+if(CHOMPO_PGO_GENERATE AND CHOMPO_PGO_USE)
+    message(FATAL_ERROR "CHOMPO_PGO_GENERATE and CHOMPO_PGO_USE are mutually exclusive")
+endif()
 
 add_executable(Chompo
         src/main.cpp
         src/lexer/symbol.h src/lexer/symbol.cpp
         src/lexer/token.h src/lexer/token.cpp src/lexer/lexer.h src/lexer/lexer.cpp
-        src/parser/ast.h src/parser/parser.h src/parser/parser.cpp src/parser/ast_printer.h src/parser/ast_printer.cpp
+        src/parser/ast.h src/parser/parser.h src/parser/parser.cpp
+        src/parser/resolver.h src/parser/resolver.cpp
+        src/parser/ast_printer.h src/parser/ast_printer.cpp
         src/interpreter/value.h src/interpreter/value.cpp
         src/interpreter/runtime_error.h src/interpreter/runtime_error.cpp
         src/interpreter/environment.h src/interpreter/environment.cpp
@@ -26,9 +35,48 @@ add_executable(Chompo
 target_include_directories(Chompo PRIVATE src)
 
 if(MSVC)
-    target_compile_options(Chompo PRIVATE /W4)
+    target_compile_options(Chompo PRIVATE
+            /W4
+            $<$<CONFIG:Release>:/O2>
+            $<$<CONFIG:Release>:/Ob3>
+            $<$<CONFIG:Release>:/GL>)
+    target_link_options(Chompo PRIVATE
+            $<$<CONFIG:Release>:/LTCG>
+            $<$<CONFIG:Release>:/OPT:REF>
+            $<$<CONFIG:Release>:/OPT:ICF>)
+
+    if(CHOMPO_NATIVE_OPTIMIZATIONS)
+        target_compile_options(Chompo PRIVATE $<$<CONFIG:Release>:/arch:AVX2>)
+    endif()
+
+    if(CHOMPO_PGO_GENERATE OR CHOMPO_PGO_USE)
+        message(FATAL_ERROR "The current PGO options are implemented for GCC/Clang toolchains")
+    endif()
 else()
-    target_compile_options(Chompo PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(Chompo PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+            $<$<CONFIG:Release>:-O3>
+            $<$<CONFIG:Release>:-fno-semantic-interposition>
+            $<$<CONFIG:Release>:-ffunction-sections>
+            $<$<CONFIG:Release>:-fdata-sections>)
+    target_link_options(Chompo PRIVATE
+            $<$<CONFIG:Release>:-Wl,--gc-sections>)
+
+    if(CHOMPO_NATIVE_OPTIMIZATIONS)
+        target_compile_options(Chompo PRIVATE
+                $<$<CONFIG:Release>:-march=native>
+                $<$<CONFIG:Release>:-mtune=native>)
+    endif()
+
+    if(CHOMPO_PGO_GENERATE)
+        target_compile_options(Chompo PRIVATE -fprofile-generate)
+        target_link_options(Chompo PRIVATE -fprofile-generate)
+    elseif(CHOMPO_PGO_USE)
+        target_compile_options(Chompo PRIVATE -fprofile-use -fprofile-correction)
+        target_link_options(Chompo PRIVATE -fprofile-use -fprofile-correction)
+    endif()
 endif()
 
 if(WIN32)
@@ -77,6 +125,8 @@ add_chompo_test(collections 0 FALSE)
 add_chompo_test(push_cycle 1 TRUE)
 add_chompo_test(push_invalid_target 1 TRUE)
 add_chompo_test(pop_invalid_target 1 TRUE)
+add_chompo_test(resolver_slots 0 FALSE)
+add_chompo_test(control_flow_fast 0 FALSE)
 
 add_test(NAME error_regressions
         COMMAND ${CMAKE_COMMAND}
@@ -115,5 +165,5 @@ if(CHOMPO_ENABLE_PERFORMANCE_TESTS)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/performance/run_performance_suite.py
                     --executable $<TARGET_FILE:Chompo>
                     --cases ${CMAKE_CURRENT_SOURCE_DIR}/tests/performance/cases)
-    set_tests_properties(performance_tle PROPERTIES LABELS performance TIMEOUT 60)
+    set_tests_properties(performance_tle PROPERTIES LABELS performance TIMEOUT 70)
 endif()

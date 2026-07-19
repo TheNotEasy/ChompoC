@@ -71,11 +71,13 @@ void Interpreter::install_collection_builtins() {
                     throw RuntimeError(token, "push would make the array too large");
 
                 for (std::size_t index = 1; index < arguments.size(); ++index) {
-                    if (contains_array(arguments[index], array.get()))
+                    if (arguments[index].is_array() && contains_array(arguments[index], array.get()))
                         throw RuntimeError(token, "cyclic array references are not allowed");
                 }
 
-                array->reserve(array->size() + added_count);
+                // Do not reserve exactly size + added_count here. Repeating that
+                // for single-element pushes defeats std::vector's geometric growth
+                // and turns an otherwise amortized O(1) operation into O(n^2).
                 array->insert(array->end(), arguments.begin() + 1, arguments.end());
                 return array_size_value(token, array->size());
             })));

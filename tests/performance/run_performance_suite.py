@@ -10,6 +10,7 @@ CASES = [
     ("functions.chmp", "393507460", 12.0),
     ("arrays.chmp", "937487500 25000", 12.0),
     ("scope_lookup.chmp", "2200000", 12.0),
+    ("control_flow.chmp", "199860", 12.0),
 ]
 
 
@@ -57,7 +58,7 @@ def main() -> int:
         else:
             print(f"PASS {filename}: {elapsed:.3f}s / {limit:.2f}s")
 
-    print(f"Total measured time: {total:.3f}s")
+    print(f"Total measured execution time: {total:.3f}s")
     return 1 if failed else 0
 
 
