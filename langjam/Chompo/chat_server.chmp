@@ -17,7 +17,54 @@ if (historyLimit < 1)
 
 var clients = Array{};
 var names = Array{};
+var statuses = Array{};
 var history = Array{};
+
+fun startsWith(text, prefix) {
+    if (len(text) < len(prefix))
+        return false;
+
+    var index = 0;
+    while (index < len(prefix)) {
+        if (text[index] != prefix[index])
+            return false;
+        index++;
+    }
+    return true;
+}
+
+fun sliceFrom(text, start) {
+    var result = "";
+    var index = start;
+    while (index < len(text)) {
+        result = result + text[index];
+        index++;
+    }
+    return result;
+}
+
+fun findChar(text, target, start) {
+    var index = start;
+    while (index < len(text)) {
+        if (text[index] == target)
+            return index;
+        index++;
+    }
+    return -1;
+}
+
+fun showHeader() {
+    if (!termInteractive())
+        return NULL;
+
+    termClear();
+    termPrint("╔════════════════════════════════════════════════════════════╗", "accent");
+    termPrint("║                   CHOMPO CHAT SERVER                       ║", "accent");
+    termPrint("╚════════════════════════════════════════════════════════════╝", "accent");
+    termPrint("/help  /users  /say <text>  /kick <name>  /clear  /stop", "muted");
+    termPrint("", "default");
+    return NULL;
+}
 
 fun findClient(handle) {
     var index = 0;
@@ -29,14 +76,22 @@ fun findClient(handle) {
     return -1;
 }
 
-fun nameTaken(candidate) {
+fun findName(candidate) {
     var index = 0;
     while (index < len(names)) {
         if (names[index] == candidate)
-            return true;
+            return index;
         index++;
     }
-    return false;
+    return -1;
+}
+
+fun nameTaken(candidate) {
+    return findName(candidate) >= 0;
+}
+
+fun validStatus(value) {
+    return value == "online" || value == "away" || value == "busy" || value == "dnd";
 }
 
 fun sendLine(handle, text) {
@@ -52,11 +107,11 @@ fun removeClientAt(index, announce) {
     netClose(handle);
     removeAt(clients, index);
     removeAt(names, index);
+    removeAt(statuses, index);
 
     if (announce && name != NULL) {
         var notice = "* " + name + " left";
-        print(notice, "\n");
-        flush();
+        termPrint(notice, "system");
         broadcast(notice);
     }
 }
@@ -90,24 +145,64 @@ fun sendHistory(handle) {
     return sendLine(handle, "END");
 }
 
+fun sendUsers(handle) {
+    var count = 0;
+    var index = 0;
+    while (index < len(names)) {
+        if (names[index] != NULL)
+            count++;
+        index++;
+    }
+
+    if (!sendLine(handle, "USERS " + String(count)))
+        return false;
+
+    index = 0;
+    while (index < len(names)) {
+        if (names[index] != NULL) {
+            if (!sendLine(handle, "USER " + names[index] + " " + statuses[index]))
+                return false;
+        }
+        index++;
+    }
+
+    return sendLine(handle, "END");
+}
+
+fun validateName(handle, candidate) {
+    if (len(candidate) == 0) {
+        sendLine(handle, "ERROR name cannot be empty");
+        return false;
+    }
+
+    if (len(candidate) > 96) {
+        sendLine(handle, "ERROR name is too long");
+        return false;
+    }
+
+    if (candidate[0] == "/"[0]) {
+        sendLine(handle, "ERROR name cannot start with '/'");
+        return false;
+    }
+
+    if (nameTaken(candidate)) {
+        sendLine(handle, "ERROR name is already in use");
+        return false;
+    }
+
+    return true;
+}
+
 fun registerName(handle, candidate) {
     var index = findClient(handle);
     if (index < 0)
         return false;
 
-    if (len(candidate) == 0)
-        return sendLine(handle, "ERROR name cannot be empty");
-
-    if (len(candidate) > 96)
-        return sendLine(handle, "ERROR name is too long");
-
-    if (candidate[0] == '/')
-        return sendLine(handle, "ERROR name cannot start with '/'");
-
-    if (nameTaken(candidate))
-        return sendLine(handle, "ERROR name is already in use");
+    if (!validateName(handle, candidate))
+        return true;
 
     names[index] = candidate;
+    statuses[index] = "online";
 
     if (!sendLine(handle, "OK " + candidate)) {
         removeClientAt(index, false);
@@ -122,10 +217,67 @@ fun registerName(handle, candidate) {
     }
 
     var notice = "* " + candidate + " joined";
-    print(notice, "\n");
-    flush();
+    termPrint(notice, "system");
     broadcast(notice);
     return findClient(handle) >= 0;
+}
+
+fun updateStatus(handle, value) {
+    var index = findClient(handle);
+    if (index < 0)
+        return false;
+
+    if (!validStatus(value))
+        return sendLine(handle, "ERROR status must be online, away, busy or dnd");
+
+    statuses[index] = value;
+    var notice = "* " + names[index] + " is now " + value;
+    termPrint(notice, "system");
+    broadcast(notice);
+    return findClient(handle) >= 0;
+}
+
+fun renameClient(handle, candidate) {
+    var index = findClient(handle);
+    if (index < 0)
+        return false;
+
+    if (!validateName(handle, candidate))
+        return true;
+
+    var oldName = names[index];
+    names[index] = candidate;
+    sendLine(handle, "OK renamed to " + candidate);
+    var notice = "* " + oldName + " is now known as " + candidate;
+    termPrint(notice, "system");
+    broadcast(notice);
+    return findClient(handle) >= 0;
+}
+
+fun sendPrivate(handle, command) {
+    var separator = findChar(command, " "[0], 0);
+    if (separator < 1)
+        return sendLine(handle, "ERROR usage: /msg <name> <message>");
+
+    var targetName = "";
+    var index = 0;
+    while (index < separator) {
+        targetName = targetName + command[index];
+        index++;
+    }
+
+    var text = sliceFrom(command, separator + 1);
+    if (len(text) == 0)
+        return sendLine(handle, "ERROR private message cannot be empty");
+
+    var senderIndex = findClient(handle);
+    var targetIndex = findName(targetName);
+    if (targetIndex < 0)
+        return sendLine(handle, "ERROR user is not connected");
+
+    if (!sendLine(clients[targetIndex], "[DM from " + names[senderIndex] + "] " + text))
+        return false;
+    return sendLine(handle, "[DM to " + targetName + "] " + text);
 }
 
 fun processLine(handle, line) {
@@ -144,43 +296,62 @@ fun processLine(handle, line) {
         return false;
     }
 
-    if (line == "/help") {
-        if (!sendLine(handle, "COMMANDS /help /history /quit")) {
-            index = findClient(handle);
-            if (index >= 0)
-                removeClientAt(index, true);
-            return false;
-        }
-        return true;
+    if (line == "/help")
+        return sendLine(handle, "COMMANDS /help /history /users /status [online|away|busy|dnd] /nick <name> /me <action> /msg <name> <message> /ping /quit");
+
+    if (line == "/history")
+        return sendHistory(handle);
+
+    if (line == "/users")
+        return sendUsers(handle);
+
+    if (line == "/status")
+        return sendLine(handle, "STATUS " + statuses[index]);
+
+    if (line == "/online")
+        return updateStatus(handle, "online");
+    if (line == "/away")
+        return updateStatus(handle, "away");
+    if (line == "/busy")
+        return updateStatus(handle, "busy");
+    if (line == "/dnd")
+        return updateStatus(handle, "dnd");
+
+    if (startsWith(line, "/status "))
+        return updateStatus(handle, sliceFrom(line, 8));
+
+    if (startsWith(line, "/nick "))
+        return renameClient(handle, sliceFrom(line, 6));
+
+    if (startsWith(line, "/me ")) {
+        var action = sliceFrom(line, 4);
+        if (len(action) == 0)
+            return sendLine(handle, "ERROR action cannot be empty");
+        var actionMessage = "* " + names[index] + " " + action;
+        appendHistory(actionMessage);
+        termPrint(actionMessage, "accent");
+        broadcast(actionMessage);
+        return findClient(handle) >= 0;
     }
 
-    if (line == "/history") {
-        if (!sendHistory(handle)) {
-            index = findClient(handle);
-            if (index >= 0)
-                removeClientAt(index, true);
-            return false;
-        }
-        return true;
-    }
+    if (startsWith(line, "/msg "))
+        return sendPrivate(handle, sliceFrom(line, 5));
+
+    if (line == "/ping")
+        return sendLine(handle, "PONG");
+
+    if (len(line) > 0 && line[0] == "/"[0])
+        return sendLine(handle, "ERROR unknown command; use /help");
 
     if (len(line) == 0)
         return true;
 
-    if (len(line) > 4096) {
-        if (!sendLine(handle, "ERROR message is too long")) {
-            index = findClient(handle);
-            if (index >= 0)
-                removeClientAt(index, true);
-            return false;
-        }
-        return true;
-    }
+    if (len(line) > 4096)
+        return sendLine(handle, "ERROR message is too long");
 
     var message = names[index] + ": " + line;
     appendHistory(message);
-    print(message, "\n");
-    flush();
+    termPrint(message, "message");
     broadcast(message);
     return findClient(handle) >= 0;
 }
@@ -193,10 +364,8 @@ fun drainClient(handle) {
             return true;
 
         if (packet[0] == "closed" || packet[0] == "error") {
-            if (packet[0] == "error") {
-                print("SECURITY rejected client packet: ", packet[1], "\n");
-                flush();
-            }
+            if (packet[0] == "error")
+                termPrint("SECURITY rejected client packet: " + packet[1], "error");
             var index = findClient(handle);
             if (index >= 0)
                 removeClientAt(index, true);
@@ -218,12 +387,12 @@ fun acceptPending(listener) {
 
         var secure = netSecureServer(client, roomPassword, 7000);
         if (secure[0] != "ok") {
-            print("SECURITY rejected connection: ", secure[1], "\n");
-            flush();
+            termPrint("SECURITY rejected connection: " + secure[1], "error");
             netClose(client);
         } else {
             push(clients, client);
             push(names, NULL);
+            push(statuses, "connecting");
 
             if (!sendLine(client, "NAME choose a unique name"))
                 removeClientAt(len(clients) - 1, false);
@@ -231,24 +400,100 @@ fun acceptPending(listener) {
     }
 }
 
+fun printServerUsers() {
+    termPrint("Connected users: " + String(len(clients)), "info");
+    var index = 0;
+    while (index < len(names)) {
+        if (names[index] == NULL)
+            termPrint("  <authorizing>", "muted");
+        else
+            termPrint("  " + names[index] + " [" + statuses[index] + "]", "message");
+        index++;
+    }
+}
+
+fun processServerCommand(line) {
+    if (len(line) == 0)
+        return true;
+
+    if (line == "/help") {
+        termPrint("SERVER COMMANDS /help /users /say <text> /kick <name> /clear /stop", "info");
+        return true;
+    }
+
+    if (line == "/users") {
+        printServerUsers();
+        return true;
+    }
+
+    if (line == "/clear") {
+        showHeader();
+        termSetPrompt("server › ", "warning");
+        return true;
+    }
+
+    if (startsWith(line, "/say ")) {
+        var message = "[SERVER] " + sliceFrom(line, 5);
+        appendHistory(message);
+        termPrint(message, "warning");
+        broadcast(message);
+        return true;
+    }
+
+    if (startsWith(line, "/kick ")) {
+        var target = sliceFrom(line, 6);
+        var index = findName(target);
+        if (index < 0) {
+            termPrint("User is not connected: " + target, "error");
+            return true;
+        }
+        sendLine(clients[index], "KICKED by server");
+        termPrint("Kicked " + target, "warning");
+        removeClientAt(index, true);
+        return true;
+    }
+
+    if (line == "/stop")
+        return false;
+
+    termPrint("Unknown server command. Use /help.", "error");
+    return true;
+}
+
+fun closeAll(listener) {
+    broadcast("SERVER shutting down");
+    while (len(clients) > 0)
+        removeClientAt(0, false);
+    netClose(listener);
+    termSetPrompt("");
+    termClose();
+    return NULL;
+}
+
 fun main() {
+    termOpen();
+    termSetTitle("Chompo Chat Server");
+
     if (roomPassword == NULL || len(roomPassword) < 8) {
-        print("ERROR: provide a room password with at least 8 bytes.\n");
-        print("Usage: chat_server.chmp <host> <port> <history> <password>\n");
-        flush();
+        termPrint("ERROR: provide a room password with at least 8 bytes.", "error");
+        termPrint("Usage: chat_server.chmp <host> <port> <history> <password>", "info");
+        termClose();
         return NULL;
     }
 
     var listener = netListen(bindHost, bindPort, 64);
-    print("LISTENING ", netPort(listener), " SECURE AES-256-GCM\n");
-    flush();
+    if (termInteractive())
+        showHeader();
+    termPrint("LISTENING " + String(netPort(listener)) + " SECURE AES-256-GCM", "success");
+    termSetPrompt("server › ", "warning");
 
-    while (true) {
+    var running = true;
+    while (running) {
         var watched = Array{listener};
         for (var client in clients)
             push(watched, client);
 
-        var ready = netPoll(watched, 100);
+        var ready = netPoll(watched, 25);
         for (var handle in ready) {
             if (handle == listener) {
                 acceptPending(listener);
@@ -257,7 +502,13 @@ fun main() {
                     drainClient(handle);
             }
         }
+
+        var console = termPoll(0);
+        if (console[0] == "data")
+            running = processServerCommand(console[1]);
     }
+
+    return closeAll(listener);
 }
 
 main();
