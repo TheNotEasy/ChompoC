@@ -1,6 +1,7 @@
 # Chompo — LangJam submission
 
 Chompo is a dynamically typed language implemented by a C++23 interpreter. The chat server and client in this directory are written entirely in Chompo.
+<img width="1683" height="648" alt="изображение" src="https://github.com/user-attachments/assets/fe714ee8-fa6d-4e52-8cbc-18fbcb375c28" />
 
 ## Security model
 
