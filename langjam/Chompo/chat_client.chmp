@@ -1,14 +1,17 @@
 var commandLine = args();
 var serverHost = "127.0.0.1";
 var serverPort = 4040;
+var roomPassword = NULL;
 
 if (len(commandLine) > 0)
     serverHost = commandLine[0];
 if (len(commandLine) > 1)
     serverPort = Int(commandLine[1]);
+if (len(commandLine) > 2)
+    roomPassword = commandLine[2];
 
 fun sendLine(socket, text) {
-    var result = netSendAll(socket, text + "\n", 2000);
+    var result = netSecureSendLine(socket, text, 2000);
     return result[0] == "sent";
 }
 
@@ -22,7 +25,10 @@ fun printPacket(packet) {
     if (packet[0] == "wait")
         return true;
 
-    print("Disconnected from server.\n");
+    if (packet[0] == "error")
+        print("Security error: ", packet[1], "\n");
+    else
+        print("Disconnected from server.\n");
     flush();
     return false;
 }
@@ -34,7 +40,7 @@ fun waitForGoodbye(socket) {
         var ready = netPoll(Array{socket}, 100);
         if (len(ready) > 0) {
             while (true) {
-                var packet = netReceiveLine(socket);
+                var packet = netSecureReceiveLine(socket);
 
                 if (packet[0] == "wait")
                     break;
@@ -57,18 +63,43 @@ fun waitForGoodbye(socket) {
 }
 
 fun main() {
-    var socket = netConnect(serverHost, serverPort);
+    if (roomPassword == NULL) {
+        print("Room password: ");
+        flush();
+        roomPassword = input();
+    }
 
+    if (roomPassword == NULL || len(roomPassword) < 8) {
+        print("Room password must contain at least 8 bytes.\n");
+        flush();
+        return NULL;
+    }
+
+    var socket = netConnect(serverHost, serverPort);
+    print("Securing connection to ", serverHost, ":", serverPort, "...\n");
+    flush();
+
+    var secure = netSecureClient(socket, roomPassword, 7000);
+    if (secure[0] != "ok") {
+        print("Secure connection failed: ", secure[1], "\n");
+        flush();
+        netClose(socket);
+        return NULL;
+    }
+
+    print("Encrypted with AES-256-GCM.\n");
     print("Name: ");
     flush();
     var name = input();
     if (name == NULL) {
+        netSecureForget(socket);
         netClose(socket);
         return NULL;
     }
 
     if (!sendLine(socket, name)) {
         print("Failed to send name.\n");
+        netSecureForget(socket);
         netClose(socket);
         return NULL;
     }
@@ -78,7 +109,7 @@ fun main() {
         var ready = netPoll(Array{socket}, 50);
         if (len(ready) > 0) {
             while (true) {
-                var packet = netReceiveLine(socket);
+                var packet = netSecureReceiveLine(socket);
                 if (packet[0] == "wait")
                     break;
                 if (!printPacket(packet)) {
@@ -113,6 +144,7 @@ fun main() {
         }
     }
 
+    netSecureForget(socket);
     netClose(socket);
     return NULL;
 }
