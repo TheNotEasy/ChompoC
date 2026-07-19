@@ -145,4 +145,4 @@ ctest --test-dir build --output-on-failure
 
 ## Лицензия
 
-MIT — см. [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
