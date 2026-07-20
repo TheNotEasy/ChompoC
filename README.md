@@ -59,6 +59,7 @@ ctest --test-dir build --output-on-failure
 ```
 
 ## ⚡ Example
+
 ```
 fun makeCounter(start) {
     var value = start;
@@ -78,31 +79,37 @@ print(values, "\n"); // {11, 12, 13}
 ```
 ## 🧩 Core Syntax
 
-Chompo uses a clean, expression-oriented syntax close to JavaScript/C with first-class functions and closures.
-Core constructs:
-fun name(params) { ... } — function declaration (closures supported)
-var x = ... — variable declaration with lexical scoping
-if / else, while, for-in, break, continue, return
-Arrays: Array{1, 2, 3}, indexing, push, pop, removeAt, len, in, concatenation and repetition
-Strings are mutable byte sequences with char indexing
-Everything is an expression where possible; functions are values
-Full syntax reference: docs/wiki/Language-Syntax.md
-Built-in functions: docs/wiki/Built-in-Functions.md
+```text
+source -> Lexer -> Pratt Parser -> Resolver -> optimized Interpreter
+```
+
+The Resolver converts local names into `(depth, slot)` addresses once. At runtime, local variables are read from dense slots without repeated string hashing.
+
+Additional hot-path optimizations include:
+
+- decoded literals cached in the AST;
+- no environment allocation for blocks without local declarations;
+- reusable block, loop, and function environments;
+- `return`, `break`, and `continue` without C++ exceptions;
+- direct assignment and update targets;
+- specialized integer arithmetic paths;
+- reusable argument vectors;
+- amortized O(1) `push`;
+- Release `-O3`/`/O2`, IPO/LTO, and optional native/PGO modes.
+
+Global values and native functions remain in an extensible `SymbolId` registry, so new modules can be added without changing the local-slot runtime.
+
+See [Runtime Architecture](docs/wiki/Runtime-Architecture.md).
+
+## Testing
+
+```bash
+ctest --test-dir build --output-on-failure
+```
 
 ## 📥 Input and Output / 🌐 Network API
 
-Chompo ships with powerful console/file I/O and a complete non-blocking TCP stack available directly from the language.
-I/O:
-input(), inputPoll(fd) — console input (pollable)
-istream / ostream / iostream — file streams (support "append" mode)
-flush()
-TCP (event-driven via netPoll):
-Listener and client sockets
-netSend / netSendAll (with timeout) returning {"sent", n}, {"timeout", n}, {"error", n, msg}
-netReceiveLine returning {"data", line}, {"wait"}, {"closed"} or {"error", msg}
-Full multi-user chat (server + client) implemented 100% in Chompo
-See detailed protocol handling and examples in langjam/Chompo/chat_server.chmp / chat_client.chmp.
-Complete reference: docs/wiki/Network-API.md and docs/wiki/LangJam-Chat.md
+The suite includes language and error regression tests, file and console I/O, TCP loopback tests, and `langjam_chat`. The end-to-end chat test starts a real Chompo server, connects multiple clients, verifies duplicate-name rejection, broadcast, history, commands, graceful exit, TCP reset cleanup, and launches the actual Chompo client.
 
 ## 🏁 LangJam Readiness
 
