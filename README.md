@@ -11,14 +11,14 @@
 ![Runtime](https://img.shields.io/badge/runtime-tree--walk-7c3aed)
 ![LangJam](https://img.shields.io/badge/LangJam-complete-10b981)
 
-**Chompo** is a dynamically typed language with `.chmp` files, first-class functions, closures, mutable arrays and strings, file I/O, and a complete TCP networking API (including a working multi-user chat implementation).
+**Chompo** is a dynamically typed language with `.chmp` files, first-class functions, closures, mutable arrays and strings, file I/O, and a complete TCP networking API (including a fully working multi-user chat implementation).
 
-[Features](#-features) · [Quick Start](#-quick-start) · [I/O](#-input-and-output) · [Network API](#-network-api) · [LangJam](#-langjam-readiness) · [Roadmap](#-roadmap)
+[Features](#-features) · [Quick Start](#-quick-start) · [Example](#-example) · [Core Syntax](#-core-syntax) · [I/O](#-input-and-output) · [Network API](#-network-api) · [LangJam](#-langjam-readiness) · [Roadmap](#-roadmap)
 
 </div>
 
 > [!IMPORTANT]
-> The active development branch is `dev`. LangJam requirements (language + multi-user chat) are now fully satisfied.
+> The active development branch is `dev`. All LangJam requirements (language + multi-user chat) are now **fully satisfied**.
 
 **Русская версия** → [README_RU.md](README_RU.md)
 
@@ -34,11 +34,13 @@
 | Strings        | ✅     | byte `char`, indexing and mutation |
 | I/O            | ✅     | `input`, `istream`, `ostream`, `iostream` |
 | TCP            | ✅     | listener, client socket, `netPoll`, accept, send, receive, close |
-| Chat           | ✅     | multi-user chat server + client implemented in Chompo |
+| Chat           | ✅     | multi-user chat server + client fully implemented in Chompo |
 | Reliability    | ✅     | Runtime StackOverflow protection, cyclic array prevention, full test suite |
 | LangJam        | ✅     | All mandatory requirements completed |
 
 ## 🚀 Quick Start
+
+Requires a C++23 compiler and CMake 4.2+.
 
 ```bash
 cmake -S . -B build
@@ -52,7 +54,7 @@ ctest --test-dir build --output-on-failure
 ./build/Chompo program.chmp
 ```
 
-**Windows:**
+**Windows (multi-config):**
 
 ```powershell
 .\build\Debug\Chompo.exe program.chmp
@@ -60,67 +62,124 @@ ctest --test-dir build --output-on-failure
 
 ## ⚡ Example
 
-```
-fun makeCounter(start) {
-    var value = start;
+```javascript
+fun sum(values) {
+    var result = 0;
 
-    fun next() {
-        value++;
-        return value;
-    }
+    for (var value in values)
+        result += value;
 
-    return next;
+    return result;
 }
 
-var counter = makeCounter(10);
-var values = Array{counter(), counter()};
-push(values, 13);
-print(values, "\n"); // {11, 12, 13}
+var values = Array{10, 20, 30};
+print(sum(values), "\n");
 ```
+
 ## 🧩 Core Syntax
 
-```text
-source -> Lexer -> Pratt Parser -> Resolver -> optimized Interpreter
+```javascript
+var value = 10;
+value += 5;
+
+if (value > 10) {
+    print("large\n");
+}
+
+while (value > 0)
+    value--;
+
+for (var character in "Chompo") {
+    if (character == 'm')
+        continue;
+
+    print(character);
+}
 ```
 
-The Resolver converts local names into `(depth, slot)` addresses once. At runtime, local variables are read from dense slots without repeated string hashing.
+Built-in conversions: `Int`, `Double`, `Bool`, `String`, `Char`, `Array`, `CATS`, `Type`.
 
-Additional hot-path optimizations include:
+## 📥 Input and Output
 
-- decoded literals cached in the AST;
-- no environment allocation for blocks without local declarations;
-- reusable block, loop, and function environments;
-- `return`, `break`, and `continue` without C++ exceptions;
-- direct assignment and update targets;
-- specialized integer arithmetic paths;
-- reusable argument vectors;
-- amortized O(1) `push`;
-- Release `-O3`/`/O2`, IPO/LTO, and optional native/PGO modes.
+`input()` reads one line without `\n`. Returns `NULL` on EOF.
 
-Global values and native functions remain in an extensible `SymbolId` registry, so new modules can be added without changing the local-slot runtime.
+Standard stream is denoted by string `"standart"` (spelling preserved as part of current API).
 
-See [Runtime Architecture](docs/wiki/Runtime-Architecture.md).
+File modes supported: `"rewrite"`, `"append"`, `"create"`.
 
-## Testing
+## 🌐 Network API
+
+Uses host TCP sockets. No custom VM required.
+
+**Key functions:** `netListen`, `netConnect`, `netAccept`, `netPoll`, `netSend`, `netReceive`/`netReceiveLine`, `netClose`, `netPort`.
+
+API is synchronous but sockets are non-blocking. `netPoll` enables a single-threaded event loop for multiple clients.
+
+**Minimal echo server example:**
+
+```javascript
+var listener = netListen("0.0.0.0", 4040);
+var clients = Array{};
+
+while (true) {
+    var watched = Array{listener} + clients;
+    var ready = netPoll(watched, 100);
+
+    for (var handle in ready) {
+        if (handle == listener) {
+            var client = netAccept(listener);
+            if (client != NULL)
+                clients += Array{client};
+            continue;
+        }
+
+        var packet = netReceiveLine(handle);
+
+        if (packet[0] == "data")
+            netSend(handle, packet[1] + "\n");
+    }
+}
+```
+
+> [!NOTE]
+> Full multi-user chat (with `/help`, `/history`, `/quit`, timestamps, history persistence, graceful disconnects) is implemented in `langjam/Chompo/`.
+
+## 🏗 Architecture
+
+```mermaid
+flowchart LR
+    A[.chmp source] --> B[Lexer]
+    B --> C[Pratt Parser]
+    C --> D[AST]
+    D --> E[Tree-walk Interpreter]
+    E --> F[Environment / Closures]
+    E --> G[Value Runtime]
+    E --> H[Native APIs]
+    H --> I[File I/O]
+    H --> J[TCP NetworkManager]
+    J --> K[poll-based event loop]
+```
+
+A tree-walk interpreter fully satisfies the “compiler or interpreter” requirement. Bytecode VM can be added later for performance.
+
+## 🧪 Testing
 
 ```bash
 ctest --test-dir build --output-on-failure
 ```
 
-## 📥 Input and Output / 🌐 Network API
-
-The suite includes language and error regression tests, file and console I/O, TCP loopback tests, and `langjam_chat`. The end-to-end chat test starts a real Chompo server, connects multiple clients, verifies duplicate-name rejection, broadcast, history, commands, graceful exit, TCP reset cleanup, and launches the actual Chompo client.
+Suite includes golden tests, error regressions, file I/O, TCP loopback, and end-to-end chat tests. GitHub Actions runs on Windows + Ubuntu.
 
 ## 🏁 LangJam Readiness
 
 **✅ All requirements fulfilled**
 
-- Language with full syntax and semantics
+- Full language with syntax and semantics
 - Multi-user chat room (server + client) implemented entirely in Chompo
 - TCP foundation with `netPoll`-based event loop
-- Automatic tests on Windows and Linux
+- Automated tests on Windows and Linux
 
-**Bonus features implemented** (for extra points):
+**Bonus features** (for architecture/creativity points):
 - Commands `/help`, `/history`, `/quit`
 - Timestamps
 - Graceful client disconnect handling
@@ -129,10 +188,17 @@ The suite includes language and error regression tests, file and console I/O, TC
 ## 🗺 Roadmap
 
 ### Before LangJam (completed)
-- All control flow, I/O, TCP, **multi-user chat**
+- All control flow, I/O, TCP, **multi-user chat**, submission package
 
 ### After LangJam
-- `Map`, modules, exceptions, Unicode, GC, bytecode VM, async runtime, REPL, LSP и т.д.
+- `Map`/dictionaries
+- Modules and `import`
+- Language exceptions
+- Unicode
+- Garbage collector for cyclic graphs
+- Bytecode VM (only if needed for performance)
+- Actors/channels + full async runtime
+- REPL, formatter, LSP, editor plugins
 
 ## 📄 License
 
