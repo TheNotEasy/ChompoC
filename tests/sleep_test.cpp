@@ -42,7 +42,7 @@ const std::int64_t EPSILON = 100;
 int main() {
     try {
 
-        std::mt19937 rand(9858795897);
+        std::mt19937 rand(985879);
         std::int64_t time = rand() % 3000;
 
         auto start = std::chrono::steady_clock::now();
