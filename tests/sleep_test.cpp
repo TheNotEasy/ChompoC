@@ -41,9 +41,9 @@ const std::int64_t EPSILON = 100;
 
 int main() {
     try {
-
         std::mt19937 rand(985879);
-        std::int64_t time = rand() % 3000;
+        std::uniform_int_distribution<std::int32_t> dist(1000, 3000);
+        std::int64_t time = dist(rand);
 
         auto start = std::chrono::steady_clock::now();
         inline_interpret(
